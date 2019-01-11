@@ -9,7 +9,21 @@ enum SPECIAL_KEYS
 	ESC,
 	Backspace,
 	Delete,
-	Enter
+	Enter,
+	Up,
+	Down,
+	Left,
+	Right,
+	Next,
+	Prior,
+	End,
+	Home,
+	Insert,
+	Apps,
+	Windows_Right,
+	Windows_Left,
+	Pause_Break,
+	Print
 };
 
 typedef struct 
@@ -24,8 +38,6 @@ typedef struct
 } modifiers_t;
 
 typedef void (*key_event)(char, enum SPECIAL_KEYS, modifiers_t*);
-
-unsigned char keyboard_state;
 
 void init_keyboard();
 

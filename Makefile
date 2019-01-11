@@ -47,6 +47,8 @@ buildrepo:
 	@$(call make-repo)
 	
 define make-repo
+mkdir bin; \
+mkdir build; \
 for dir in $(SRCDIRS); \
 do \
 mkdir -p build/$$dir; \

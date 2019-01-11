@@ -6,7 +6,15 @@
 #include "util/string.h"
 
 static void redraw_buffer();
-static void insert(unsigned char index, char value);
+static void insert(unsigned char, char);
+static void key_pressed(char, enum SPECIAL_KEYS, modifiers_t*);
+static void clear_buffer(void);
+static void print_filepath();
+static void shell_execute();
+static void shell_type_char(char);
+static void shell_delete_key(unsigned char);
+static void shell_directional_key(unsigned char);
+static unsigned char buffer_size();
 
 char buffer[BUFFER_SIZE];
 unsigned char cursor;
@@ -14,38 +22,12 @@ unsigned char buffer_x, buffer_y;
 
 int key_callback;
 
-static void key_pressed(char ascii, enum SPECIAL_KEYS sp_keys, modifiers_t *modifier_keys)
-{
-	if (sp_keys == Backspace)
-		shell_delete_key(0);
-	else if (sp_keys == Enter)
-		shell_execute();
-	else
-		shell_type_char(ascii);
-}
-
-void init_shell()
-{
-	terminal_writeline("OwO GmbH<R> OwOS ver. 0.1");
-	terminal_writeline("    <C> OwO GmbH Sept. 2018 - Juli 2021\n");
-	
-	terminal_writestring("A:>");
-	terminal_setcursorpos(-1, -1);
-	
-	cursor = 0;
-	terminal_getcursorpos(&buffer_x, &buffer_y);
-	terminal_setcursorpos((int)buffer_x, (int)buffer_y);
-	
-	key_callback = register_key_pressed_callback(key_pressed);
-}
-
 static void redraw_buffer()
 {
 	terminal_setinternalcursor(buffer_x, buffer_y);
 	for (unsigned short i = 0; i < BUFFER_SIZE; i++)
-	{
 		terminal_putchar(buffer[i]);
-	}
+
 	terminal_setcursorpos((buffer_x + cursor) % VGA_WIDTH, buffer_y + ((cursor + buffer_x % VGA_WIDTH) / VGA_WIDTH));
 }
 
@@ -65,11 +47,19 @@ static void delete(unsigned char index)
 	buffer[BUFFER_SIZE - 1] = '\0';
 }
 
-static void clear_buffer()
+static void clear_buffer(void)
 {
 	for (int i = 0; i < BUFFER_SIZE - 1; i++)
 		buffer[i] = '\0';
 	cursor = 0;
+}
+
+static unsigned char buffer_size()
+{
+	unsigned char limit = 255;
+	while (limit > 0 && buffer[limit] == '\0')
+		limit--;
+	return limit;
 }
 
 static void print_filepath()
@@ -80,17 +70,17 @@ static void print_filepath()
 	clear_buffer();
 }
 
-void shell_execute()
+static void shell_execute()
 {
-	terminal_setinternalcursor((buffer_x + cursor) % VGA_WIDTH, buffer_y + ((cursor + buffer_x % VGA_WIDTH) / VGA_WIDTH));
-	
+	terminal_setinternalcursor((buffer_x + buffer_size()) % VGA_WIDTH, buffer_y + ((buffer_size() + buffer_x % VGA_WIDTH) / VGA_WIDTH));
+
 	unsigned char argc = 0;
 	char** argv = split(&buffer[0], ' ', 256, &argc);
 	if (argv == 0)
 		return;
-		
+
 	terminal_putchar('\n');
-	
+
 	if (strcmp(argv[0], "echo") == 0)
 	{
 		for (int i = 1; i < argc; i++)
@@ -104,11 +94,11 @@ void shell_execute()
 	{
 		terminal_writeline("Unknown Command");
 	}
-	
+
 	print_filepath();
 }
 
-void shell_type_char(char c)
+static void shell_type_char(char c)
 {
 	insert(cursor, c);
 	if (cursor < 255)
@@ -116,7 +106,7 @@ void shell_type_char(char c)
 	redraw_buffer();
 }
 
-void shell_delete_key(unsigned char front)
+static void shell_delete_key(unsigned char front)
 {
 	if (front == 0 && cursor > 0)
 		delete(--cursor);
@@ -125,21 +115,13 @@ void shell_delete_key(unsigned char front)
 	redraw_buffer();
 }
 
-void shell_function_key(unsigned char index)
+static void shell_directional_key(unsigned char index)
 {
-	
-}
-
-void shell_directional_key(unsigned char index)
-{
-	unsigned char limit = 255;
-	while(limit > 0 && buffer[limit] == '\0')
-		limit--;
-		
-	if (limit < 255) 
+	unsigned char limit = buffer_size();
+	if (limit < 255)
 		limit++;
-	
-	switch(index)
+
+	switch (index)
 	{
 		case 0: //Up
 			cursor = max((short)cursor - VGA_WIDTH, 0);
@@ -157,4 +139,51 @@ void shell_directional_key(unsigned char index)
 			break;
 	}
 	redraw_buffer();
+}
+
+static void key_pressed(char ascii, enum SPECIAL_KEYS sp_keys, modifiers_t *modifier_keys)
+{
+	switch (sp_keys)
+	{
+		case Backspace:
+			shell_delete_key(0);
+			break;
+		case Delete:
+			shell_delete_key(1);
+			break;
+		case Enter:
+			shell_execute();
+			break;
+		case Up:
+			shell_directional_key(0);
+			break;
+		case Down:
+			shell_directional_key(1);
+			break;
+		case Left:
+			shell_directional_key(2);
+			break;
+		case Right:
+			shell_directional_key(3);
+			break;
+		default:
+			if (ascii != '\0')
+				shell_type_char(ascii);
+			break;
+	}
+}
+
+void init_shell()
+{
+	terminal_writeline("OwO GmbH<R> OwOS ver. 0.1");
+	terminal_writeline("    <C> OwO GmbH Sept. 2018 - Juli 2021\n");
+	
+	terminal_writestring("A:>");
+	terminal_setcursorpos(-1, -1);
+	
+	cursor = 0;
+	terminal_getcursorpos(&buffer_x, &buffer_y);
+	terminal_setcursorpos((int)buffer_x, (int)buffer_y);
+	
+	key_callback = register_key_pressed_callback(key_pressed);
 }
