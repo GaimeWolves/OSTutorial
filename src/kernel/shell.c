@@ -22,6 +22,11 @@ unsigned char buffer_x, buffer_y;
 
 int key_callback;
 
+/*********************/
+/* PRIVATE FUNCTIONS */
+/*********************/
+
+/* Zeichnet den char buffer erneut auf dem terminal. */
 static void redraw_buffer()
 {
 	terminal_setinternalcursor(buffer_x, buffer_y);
@@ -31,6 +36,7 @@ static void redraw_buffer()
 	terminal_setcursorpos((buffer_x + cursor) % VGA_WIDTH, buffer_y + ((cursor + buffer_x % VGA_WIDTH) / VGA_WIDTH));
 }
 
+/* Fügt ein Zeichen am index ein.*/
 static void insert(unsigned char index, char value)
 {
 	for (int i = BUFFER_SIZE - 1; i > index; i--)
@@ -38,6 +44,7 @@ static void insert(unsigned char index, char value)
 	buffer[index] = value;
 }
 
+/* Löscht ein Zeichen am index. */
 static void delete(unsigned char index)
 {
 	for (int i = index; i < BUFFER_SIZE - 1; i++)
@@ -47,6 +54,7 @@ static void delete(unsigned char index)
 	buffer[BUFFER_SIZE - 1] = '\0';
 }
 
+/* Setzt den buffer zurück.*/
 static void clear_buffer(void)
 {
 	for (int i = 0; i < BUFFER_SIZE - 1; i++)
@@ -54,6 +62,7 @@ static void clear_buffer(void)
 	cursor = 0;
 }
 
+/* Gibt den derzeitig gefüllten platz des buffers an. */
 static unsigned char buffer_size()
 {
 	unsigned char limit = 255;
@@ -62,6 +71,7 @@ static unsigned char buffer_size()
 	return limit;
 }
 
+/* Schreibt den derzeitigen Dateipfad auf dem terminal. */
 static void print_filepath()
 {
 	terminal_writestring("A:>");
@@ -98,6 +108,7 @@ static void shell_execute()
 	print_filepath();
 }
 
+/* Schreibt einen Buchstaben an der Cursorstelle. */
 static void shell_type_char(char c)
 {
 	insert(cursor, c);
@@ -106,6 +117,7 @@ static void shell_type_char(char c)
 	redraw_buffer();
 }
 
+/* Löscht einen Buchstaben an der Cursorstelle. */
 static void shell_delete_key(unsigned char front)
 {
 	if (front == 0 && cursor > 0)
@@ -115,6 +127,7 @@ static void shell_delete_key(unsigned char front)
 	redraw_buffer();
 }
 
+/* Bewegt den Cursor. */
 static void shell_directional_key(unsigned char index)
 {
 	unsigned char limit = buffer_size();
@@ -141,6 +154,7 @@ static void shell_directional_key(unsigned char index)
 	redraw_buffer();
 }
 
+/* Event receiver für das key_pressed Event. */
 static void key_pressed(char ascii, enum SPECIAL_KEYS sp_keys, modifiers_t *modifier_keys)
 {
 	switch (sp_keys)
@@ -173,6 +187,11 @@ static void key_pressed(char ascii, enum SPECIAL_KEYS sp_keys, modifiers_t *modi
 	}
 }
 
+/********************/
+/* PUBLIC FUNCTIONS */
+/********************/
+
+/* Initialisiert die Shell. */
 void init_shell()
 {
 	terminal_writeline("OwO GmbH<R> OwOS ver. 0.1");

@@ -3,6 +3,7 @@
 #include "../../cpu/isr.h"
 #include "../util/string.h"
 #include "../shell.h"
+#include "terminal.h"
 
 static void update_keyboard_state(unsigned char scancode, unsigned char special_sc);
 static void keyboard_callback(registers_t regs);
@@ -38,6 +39,7 @@ const char keys_ctrl_alt[] = {
 };
 
 key_event key_pressed[256];
+key_event key_released[256];
 
 unsigned char special_sc;
 unsigned char skipcounter;
@@ -52,10 +54,21 @@ modifiers_t modifiers;
 	in the key_event arrays.*/
 static void broadcast_key_event(int event, char ascii, enum SPECIAL_KEYS sp_keys)
 {
-	for (unsigned short i = 0; i < 256; i++)
+	if (event == 0)
 	{
-		if (key_pressed[i] != 0)
-			key_pressed[i](ascii, sp_keys, &modifiers);
+		for (unsigned short i = 0; i < 256; i++)
+		{
+			if (key_pressed[i] != 0)
+				key_pressed[i](ascii, sp_keys, &modifiers);
+		}
+	}
+	else
+	{
+		for (unsigned short i = 0; i < 256; i++)
+		{
+			if (key_released[i] != 0)
+				key_released[i](ascii, sp_keys, &modifiers);
+		}
 	}
 }
 
@@ -76,13 +89,28 @@ static void keyboard_callback(registers_t regs)
 		else
 			broadcast_key_event(0, keys_nomod[scancode], None);
 	}
-	else if (scancode == 0x0E) //Backspace
+	else if (scancode > RELEASED && keys_nomod[scancode - RELEASED] != 0)
 	{
-		broadcast_key_event(0, 0, Backspace);
+		if (modifiers.shift | modifiers.shift_right | modifiers.capslock)
+			broadcast_key_event(1, keys_shift[scancode], None);
+		else if (modifiers.altgr | (modifiers.alt & (modifiers.strg | modifiers.strg_right)))
+			broadcast_key_event(1, keys_ctrl_alt[scancode], None);
+		else
+			broadcast_key_event(1, keys_nomod[scancode], None);
 	}
-	else if (scancode == 0x1C) //Enter
+	else if (scancode == 0x0E || scancode == 0x0E + RELEASED) //Backspace
 	{
-		broadcast_key_event(0, 0, Enter);
+		if (scancode == 0x0E)
+			broadcast_key_event(0, 0, Backspace);
+		else
+			broadcast_key_event(1, 0, Backspace);
+	}
+	else if (scancode == 0x1C || scancode == 0x1C + RELEASED) //Enter
+	{
+		if (scancode == 0x1C)
+			broadcast_key_event(0, 0, Enter);
+		else
+			broadcast_key_event(1, 0, Enter);
 	}
     
     update_keyboard_state(scancode, special_sc);

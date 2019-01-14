@@ -1,6 +1,6 @@
 [org 0x7C00]					;Setze den allgemeinen Offset auf 0x7C00 (Anfang des Bootsektors.
 KERNEL_OFFSET equ 0x1000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile.
-
+	cli
 	mov [BOOTDRIVE], dl			;Spechere die ID der Floppy Disk in BOOTDRIVE.
 	mov bp, 0x9000				;Setze den Stack auf 0x9000.
 	mov sp, bp
@@ -25,10 +25,19 @@ load_kernel:					;Lade den Kernel.
 	mov bx, MSG_LOAD_KERNEL		;Schreibe das der Kernel geladen wird.
     call printline
 
-	mov bx, KERNEL_OFFSET		;Lade 31 Sektoren der Floppy Disk beim Kernel Offset.
-    mov dh, 31
+	xor cx, cx
+	mov bx, KERNEL_OFFSET		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	mov ch, 0x01
+	mov cl, 0x02
+    mov dh, 1
     mov dl, [BOOTDRIVE]
     call diskload
+
+	;mov bx, KERNEL_OFFSET + 17 * 512		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	;mov cx, 0b0000000001000000
+    ;mov dh, 18
+    ;mov dl, [BOOTDRIVE]
+    ;call diskload
     ret
 
 [bits 32]

@@ -5,9 +5,9 @@ diskload:
 
     mov ah, 0x02		;Interrupt 0x13 Funktion: 0x02 = Lese aus der Floppy Disk.
     mov al, dh			;Die Anzahl zu lesende Sektoren.
-    mov cl, 0x02		;Anfangssektor (0x01 ist der Bootsektor und 0x02 der erste 'verfügbare').
-    mov ch, 0x00		;Welcher Zylinder gelesen wird.
-    mov dh, 0x00		;Welcher Kopf gelesen wird (HDDs haben 4 Platten also auch 4 Köpfe).
+    ;mov cl, 0x02		;Anfangssektor (0x01 ist der Bootsektor und 0x02 der erste 'verfügbare').
+    ;mov ch, 0x00		;Welcher Zylinder gelesen wird.
+    mov dh, 0x00		;Welcher Kopf gelesen wird (HDDs haben 4 Platten also auch 4 Köpfe und Floppy Drives haben zwei Seiten).
 
     int 0x13			;Starte die BIOS-Routine.
 
