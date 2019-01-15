@@ -194,6 +194,60 @@ static char handle_special_keys(unsigned char scancode)
 		case 0x35:
 			broadcast_key_event(0, '/', None);
 			break;
+
+		case 0x2A + RELEASED:
+			skipcounter = 2;
+			broadcast_key_event(1, 0, Print);
+			break;
+		case 0x37 + RELEASED:
+			broadcast_key_event(1, 0, Print);
+			break;
+		case 0x46 + RELEASED:
+			skipcounter = 2;
+			broadcast_key_event(1, 0, Pause_Break);
+			break;
+		case 0x5B + RELEASED:
+			broadcast_key_event(1, 0, Windows_Left);
+			break;
+		case 0x5C + RELEASED:
+			broadcast_key_event(1, 0, Windows_Right);
+			break;
+		case 0x5D + RELEASED:
+			broadcast_key_event(1, 0, Apps);
+			break;
+		case 0x52 + RELEASED:
+			broadcast_key_event(1, 0, Insert);
+			break;
+		case 0x53 + RELEASED:
+			broadcast_key_event(1, 0, Delete);
+			break;
+		case 0x47 + RELEASED:
+			broadcast_key_event(1, 0, Home);
+			break;
+		case 0x4F + RELEASED:
+			broadcast_key_event(1, 0, End);
+			break;
+		case 0x49 + RELEASED:
+			broadcast_key_event(1, 0, Prior);
+			break;
+		case 0x51 + RELEASED:
+			broadcast_key_event(1, 0, Next);
+			break;
+		case 0x48 + RELEASED:
+			broadcast_key_event(1, 0, Up);
+			break;
+		case 0x4B + RELEASED:
+			broadcast_key_event(1, 0, Left);
+			break;
+		case 0x50 + RELEASED:
+			broadcast_key_event(1, 0, Down);
+			break;
+		case 0x4D + RELEASED:
+			broadcast_key_event(1, 0, Right);
+			break;
+		case 0x35 + RELEASED:
+			broadcast_key_event(1, '/', None);
+			break;
 		}
 		special_sc = 0;
 		update_keyboard_state(scancode, special_sc);

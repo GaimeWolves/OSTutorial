@@ -28,7 +28,7 @@ long_line_behaviour=1
 long_line_column=72
 
 [files]
-current_page=24
+current_page=9
 FILE_NAME_0=122;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fkernel.c;0;4
 FILE_NAME_1=164;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fports.c;0;4
 FILE_NAME_2=0;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fports.h;0;4
@@ -38,7 +38,7 @@ FILE_NAME_5=168;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fu
 FILE_NAME_6=433;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Futil%2Fmemory.c;0;4
 FILE_NAME_7=2852;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fterminal.c;0;4
 FILE_NAME_8=987;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fterminal.h;0;4
-FILE_NAME_9=624;ASM;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fboot%2Fboot.asm;0;4
+FILE_NAME_9=1005;ASM;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fboot%2Fboot.asm;0;4
 FILE_NAME_10=0;ASM;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fboot%2Fdiskload.asm;0;4
 FILE_NAME_11=1665;ASM;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fboot%2Fgdt.asm;0;4
 FILE_NAME_12=0;ASM;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fboot%2Fkernel_entry.asm;0;4
@@ -55,9 +55,9 @@ FILE_NAME_22=0;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fcpu%2Ftimer
 FILE_NAME_23=405;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fkeyboard.h;0;4
 FILE_NAME_24=3540;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fdrivers%2Fkeyboard.c;0;4
 FILE_NAME_25=52;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fshell.h;0;4
-FILE_NAME_26=2273;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Fshell.c;0;4
-FILE_NAME_27=206;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Futil%2Fmath.h;0;4
-FILE_NAME_28=0;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Futil%2Fmath.c;0;4
+FILE_NAME_26=206;C++;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Futil%2Fmath.h;0;4
+FILE_NAME_27=0;C;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2Fsrc%2Fkernel%2Futil%2Fmath.c;0;4
+FILE_NAME_28=55;Make;0;EUTF-8;1;1;0;%2Fmnt%2Fhgfs%2FOSTutorial%2FMakefile;0;4
 
 [VTE]
 last_dir=/home/gamewolves

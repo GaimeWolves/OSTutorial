@@ -15,10 +15,10 @@ OBJ = $(patsubst %.c,build/%.o,$(C_SRC))
 all: buildrepo bin/os.bin
 
 run: buildrepo bin/os.bin
-	qemu-system-i386 -boot c bin/os.bin
+	qemu-system-i386 -boot a -fda bin/os.bin
 
 debug: buildrepo bin/os.bin bin/kernel.elf
-	qemu-system-i386 -s -boot c -fda bin/os.bin &
+	qemu-system-i386 -s -fda bin/os.bin -no-reboot &
 	${GDB} -ex "target remote localhost:1234" -ex "symbol-file bin/kernel.elf"
 
 #Kernel assemble
