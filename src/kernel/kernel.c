@@ -3,6 +3,8 @@
 #include "../cpu/idt.h"
 #include "drivers/keyboard.h"
 #include "shell.h"
+#include "drivers/floppy.h"
+#include "../cpu/timer.h"
 
 void main() 
 {
@@ -10,6 +12,8 @@ void main()
 	terminal_initialize();
 	
 	asm volatile("sti");
+	init_timer(100);
 	init_keyboard();
+	init_floppy_driver();
 	init_shell();
 }

@@ -46,7 +46,8 @@ irq_common_stub:
     popa
     add esp, 8
     sti
-    iret 
+    iret
+
 	
 ; Da wir keine Information darüber haben welcher Interrupt gecallt wird und ob dieser
 ; einen Fehlercode benötigt brauchen wir für jeden Interrupt einen seperaten Codeblock

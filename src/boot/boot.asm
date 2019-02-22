@@ -1,8 +1,37 @@
 [org 0x7C00]					;Setze den allgemeinen Offset auf 0x7C00 (Anfang des Bootsektors).
-KERNEL_OFFSET equ 0x1000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile).
+KERNEL_OFFSET equ 0x9000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile).
+
+initfat12:  ;All in little-endian format
+	jmp short 0x3C
+	nop
+	dd 0x293A637E
+	dd 0x2D494843
+	dw 0x0004		;Bytes per sector (1024)
+	db 0x02			;Sectors per cluster (2)
+	dw 0x4800		;Reserved sectors (72)
+	db 0x02			;no. of FATs (2)
+	dw 0x0036		;dir entries (15360) -> 32 * 32 bytes * 15 sectors
+	dw 0x8016		;no. of sectors (5760)
+	db 0xF0			;media type descriptor (1.44Mb or 2.88Mb Floppy Disk)
+	dw 0x0900		;no. of sectors per FAT (9)
+	dw 0x2400		;no. of sectors per track (36)
+	dw 0x0200		;no. of heads / sides of media (2)
+	dd 0x00000000	;no. of hidden sectors (0)
+	dd 0x00000000	;Large sector count (0) not used because sector count <= 65535
+
+	;Extended Boot record
+	db 0x00			;Drive number (0x00 = Floppy   0x80 = Hard disk)
+	db 0x00			;Reserved
+	db 0x28			;Signature (must be 0x28 or 0x29)
+	dw 0x00000000	;VolumeID (can be ignored)
+	db "2.88 Floppy";Volume Name (11 Bytes)
+	db "FAT12   "	;System Name (8 Bytes)
+
+
+boot:
 	cli
 	mov [BOOTDRIVE], dl			;Spechere die ID der Floppy Disk in BOOTDRIVE.
-	mov bp, 0x9000				;Setze den Stack auf 0x9000.
+	mov bp, 0x8000				;Setze den Stack auf 0x9000.
 	mov sp, bp
 
 	mov bx, MSG_WELCOME			;Schreibe die Wilkommensnachricht.
@@ -26,7 +55,7 @@ load_kernel:					;Lade den Kernel.
     call printline
 
 	xor cx, cx
-	mov bx, KERNEL_OFFSET		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	mov bx, KERNEL_OFFSET		;Lade 35 Sektoren der Floppy Disk beim Kernel Offset.
 	mov ch, 0x00
 	mov cl, 0x02
     mov dh, 35
@@ -34,12 +63,23 @@ load_kernel:					;Lade den Kernel.
     call diskload
 
 	xor cx, cx
-	mov bx, KERNEL_OFFSET + 35 * 512		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	mov bx, KERNEL_OFFSET + 35 * 512		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
 	mov ch, 0x01
 	mov cl, 0x01
-    mov dh, 16
+    mov dh, 20
     mov dl, [BOOTDRIVE]
     call diskload
+
+	;mov dx, 0x1000
+	;mov es, dx
+	;xor cx, cx
+	;mov bx, 0x1E00		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	;mov ch, 0x02
+	;mov cl, 0x00
+    ;mov dh, 36
+    ;mov dl, [BOOTDRIVE]
+    ;call diskload
+
     ret
 
 [bits 32]

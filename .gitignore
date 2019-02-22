@@ -336,3 +336,7 @@ ASALocalRun/
 
 build/
 .vscode/
+
+debug.bat
+build.bat 
+execute.bat

@@ -29,7 +29,7 @@ void int_to_str(int num, char* str)
     reverse(str);
 }
 
-void uint_to_hex(unsigned int num, char* str)
+void ulong_to_hex(unsigned long num, char* str, int len)
 {
 	char* hexchars = HEX;
 	int i = 0;
@@ -37,7 +37,8 @@ void uint_to_hex(unsigned int num, char* str)
 	do
 	{
 		str[i++] = hexchars[num % 16];
-	} while((num /= 16) > 0);
+		num /= 16;
+	} while(i < len);
 	str[i] = '\0';
 	
 	reverse(str);
@@ -46,7 +47,7 @@ void uint_to_hex(unsigned int num, char* str)
 void uint_to_bin(unsigned int num, char* str, int len)
 {
 	int i = 0;
-	
+
 	do
 	{
 		str[i++] = ((num >> i) & 1) + '0';
@@ -113,4 +114,45 @@ int strcmp(const char* a, const char* b)
 		if (a[i] > b[i])
 			return 1;
 	}
+}
+
+int parse_int(const char* str)
+{
+	int ret = 0;
+
+	int sign = 1;
+
+	if (str[0] == '-')
+		sign = -1;
+
+	for (int i = 0; str[i] != '\0'; i++)
+	{
+		ret *= 10;
+		if (str[i] >= '0' && str[i] <= '9')
+			ret += (str[i] - '0');
+		else if (i != 0)
+			return ret * sign;
+	}
+
+	return ret * sign;
+}
+
+unsigned long parse_hex(const char* str)
+{
+	long ret = 0;
+
+	for (int i = 0; str[i] != '\0'; i++)
+	{
+		ret *= 16;
+		if (str[i] >= '0' && str[i] <= '9')
+			ret += (str[i] - '0');
+		else if (str[i] >= 'a' && str[i] <= 'f')
+			ret += (str[i] - 'a') + 10;
+		else if (str[i] >= 'A' && str[i] <= 'F')
+			ret += (str[i] - 'A') + 10;
+		else
+			return ret;
+	}
+
+	return ret;
 }

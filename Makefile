@@ -12,7 +12,7 @@ HEADERS = $(shell find . -name '*.h')
 
 OBJ = $(patsubst %.c,build/%.o,$(C_SRC))
 
-all: buildrepo bin/os.bin
+all: buildrepo bin/os.bin bin/kernel.elf
 
 run: buildrepo bin/os.bin
 	qemu-system-i386 -boot a -fda bin/os.bin
@@ -23,10 +23,10 @@ debug: buildrepo bin/os.bin bin/kernel.elf
 
 #Kernel assemble
 build/kernel.bin: build/kernel_entry.o ${OBJ} build/src/cpu/interrupts.o
-	${LD} -o $@ -Ttext 0x1000 $^ --oformat binary
+	${LD} -o $@ -Ttext 0x9000 $^ --oformat binary
 
 bin/kernel.elf: build/kernel_entry.o ${OBJ} build/src/cpu/interrupts.o
-	${LD} -o $@ -Ttext 0x1000 $^
+	${LD} -o $@ -Ttext 0x9000 $^
 
 build/%.o: %.c ${HEADERS}
 	${CC}  -Wall -Wextra -g -ffreestanding -masm=intel -c $< -o $@

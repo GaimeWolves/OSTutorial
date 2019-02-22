@@ -9,6 +9,9 @@ static void update_keyboard_state(unsigned char scancode, unsigned char special_
 static void keyboard_callback(registers_t regs);
 static char handle_special_keys(unsigned char scancode);
 
+static char KEY_PRESS = 0;
+static char KEY_RELEASE = 0;
+
 /* These arrays hold the ascii values of every keyboard scancode for every modifier. (Shift, AltGr, etc.) 
 	0 is specified for scancodes that don't give ascii characters. */
 const char keys_nomod[] = {
@@ -45,75 +48,69 @@ unsigned char special_sc;
 unsigned char skipcounter;
 
 modifiers_t modifiers;
+enum SPECIAL_KEYS sp_keys;
+char ascii;
 
 /*********************/
 /* PRIVATE FUNCTIONS */
 /*********************/
 
-/* This function broadcasts the key_pressed and key_released events to the event handlers specified
-	in the key_event arrays.*/
-static void broadcast_key_event(int event, char ascii, enum SPECIAL_KEYS sp_keys)
-{
-	if (event == 0)
-	{
-		for (unsigned short i = 0; i < 256; i++)
-		{
-			if (key_pressed[i] != 0)
-				key_pressed[i](ascii, sp_keys, &modifiers);
-		}
-	}
-	else
-	{
-		for (unsigned short i = 0; i < 256; i++)
-		{
-			if (key_released[i] != 0)
-				key_released[i](ascii, sp_keys, &modifiers);
-		}
-	}
-}
-
 /* This function gets called by the keyboard interrupt and handles the given scancode.*/
-static void keyboard_callback(registers_t regs) 
+static void keyboard_callback(registers_t regs)
 {
 	unsigned char scancode = port_byte_in(0x60);
-	
-	if (handle_special_keys(scancode) == 1) 
+
+	if (handle_special_keys(scancode) == 1)
 		return;
 
-    if (scancode < sizeof(keys_nomod) / sizeof(*keys_nomod) && keys_nomod[scancode] != 0)
-    {
-		if (modifiers.shift | modifiers.shift_right | modifiers.capslock)
-			broadcast_key_event(0, keys_shift[scancode], None);
-		else if (modifiers.altgr | (modifiers.alt & (modifiers.strg | modifiers.strg_right)))
-			broadcast_key_event(0, keys_ctrl_alt[scancode], None);
-		else
-			broadcast_key_event(0, keys_nomod[scancode], None);
-	}
-	else if (scancode > RELEASED && keys_nomod[scancode - RELEASED] != 0)
+	update_keyboard_state(scancode, special_sc);
+
+	if (scancode == 0x0E || scancode == 0x0E + RELEASED) //Backspace
 	{
-		if (modifiers.shift | modifiers.shift_right | modifiers.capslock)
-			broadcast_key_event(1, keys_shift[scancode], None);
-		else if (modifiers.altgr | (modifiers.alt & (modifiers.strg | modifiers.strg_right)))
-			broadcast_key_event(1, keys_ctrl_alt[scancode], None);
-		else
-			broadcast_key_event(1, keys_nomod[scancode], None);
-	}
-	else if (scancode == 0x0E || scancode == 0x0E + RELEASED) //Backspace
-	{
-		if (scancode == 0x0E)
-			broadcast_key_event(0, 0, Backspace);
-		else
-			broadcast_key_event(1, 0, Backspace);
+		ascii = 0;
+		sp_keys = Backspace;
 	}
 	else if (scancode == 0x1C || scancode == 0x1C + RELEASED) //Enter
 	{
-		if (scancode == 0x1C)
-			broadcast_key_event(0, 0, Enter);
-		else
-			broadcast_key_event(1, 0, Enter);
+		ascii = 0;
+		sp_keys = Enter;
 	}
-    
-    update_keyboard_state(scancode, special_sc);
+	else
+	{
+		char sub = 0;
+		if (scancode > RELEASED)
+		{
+			scancode -= RELEASED;
+			sub = 1;
+		}
+
+		if (keys_nomod[scancode] != '\0')
+		{
+			if (modifiers.shift | modifiers.shift_right | modifiers.capslock)
+			{
+				ascii = keys_shift[scancode];
+				sp_keys = None;
+			}
+			else if (modifiers.altgr | (modifiers.alt & (modifiers.strg | modifiers.strg_right)))
+			{
+				ascii = keys_ctrl_alt[scancode];
+				sp_keys = None;
+			}
+			else
+			{
+				ascii = keys_nomod[scancode];
+				sp_keys = None;
+			}
+		}
+
+		if (sub == 1)
+			scancode += RELEASED;
+	}
+
+	if (scancode < RELEASED)
+		KEY_PRESS = 1;
+	else
+		KEY_RELEASE = 1;
 }
 
 /* This handles special keys that consist of multiple scancodes. (eg. EO 48 for Up Arrow)*/
@@ -130,7 +127,8 @@ static char handle_special_keys(unsigned char scancode)
 		if (scancode == 0xE1)
 		{
 			skipcounter = 5;
-			broadcast_key_event(0, 0, Pause_Break);
+			ascii = 0;
+			sp_keys = Pause_Break;
 			return 1;
 		}
 		special_sc = scancode;
@@ -139,116 +137,90 @@ static char handle_special_keys(unsigned char scancode)
 
 	if (special_sc != 0)
 	{
+		int sub = 0;
+		if (scancode > RELEASED)
+		{
+			scancode -= RELEASED;
+			sub = 1;
+		}
+
 		switch (scancode)
 		{
 		case 0x2A:
 			skipcounter = 2;
-			broadcast_key_event(0, 0, Print);
+			ascii = 0;
+			sp_keys = Print;
 			break;
 		case 0x37:
-			broadcast_key_event(0, 0, Print);
+			ascii = 0;
+			sp_keys = Print;
 			break;
 		case 0x46:
 			skipcounter = 2;
-			broadcast_key_event(0, 0, Pause_Break);
+			ascii = 0;
+			sp_keys = Pause_Break;
 			break;
 		case 0x5B:
-			broadcast_key_event(0, 0, Windows_Left);
+			ascii = 0;
+			sp_keys = Windows_Left;
 			break;
 		case 0x5C:
-			broadcast_key_event(0, 0, Windows_Right);
+			ascii = 0;
+			sp_keys = Windows_Right;
 			break;
 		case 0x5D:
-			broadcast_key_event(0, 0, Apps);
+			ascii = 0;
+			sp_keys = Backspace;
 			break;
 		case 0x52:
-			broadcast_key_event(0, 0, Insert);
+			ascii = 0;
+			sp_keys = Insert;
 			break;
 		case 0x53:
-			broadcast_key_event(0, 0, Delete);
+			ascii = 0;
+			sp_keys = Delete;
 			break;
 		case 0x47:
-			broadcast_key_event(0, 0, Home);
+			ascii = 0;
+			sp_keys = Home;
 			break;
 		case 0x4F:
-			broadcast_key_event(0, 0, End);
+			ascii = 0;
+			sp_keys = End;
 			break;
 		case 0x49:
-			broadcast_key_event(0, 0, Prior);
+			ascii = 0;
+			sp_keys = Prior;
 			break;
 		case 0x51:
-			broadcast_key_event(0, 0, Next);
+			ascii = 0;
+			sp_keys = Next;
 			break;
 		case 0x48:
-			broadcast_key_event(0, 0, Up);
+			ascii = 0;
+			sp_keys = Up;
 			break;
 		case 0x4B:
-			broadcast_key_event(0, 0, Left);
+			ascii = 0;
+			sp_keys = Left;
 			break;
 		case 0x50:
-			broadcast_key_event(0, 0, Down);
+			ascii = 0;
+			sp_keys = Down;
 			break;
 		case 0x4D:
-			broadcast_key_event(0, 0, Right);
+			ascii = 0;
+			sp_keys = Right;
 			break;
 		case 0x35:
-			broadcast_key_event(0, '/', None);
-			break;
-
-		case 0x2A + RELEASED:
-			skipcounter = 2;
-			broadcast_key_event(1, 0, Print);
-			break;
-		case 0x37 + RELEASED:
-			broadcast_key_event(1, 0, Print);
-			break;
-		case 0x46 + RELEASED:
-			skipcounter = 2;
-			broadcast_key_event(1, 0, Pause_Break);
-			break;
-		case 0x5B + RELEASED:
-			broadcast_key_event(1, 0, Windows_Left);
-			break;
-		case 0x5C + RELEASED:
-			broadcast_key_event(1, 0, Windows_Right);
-			break;
-		case 0x5D + RELEASED:
-			broadcast_key_event(1, 0, Apps);
-			break;
-		case 0x52 + RELEASED:
-			broadcast_key_event(1, 0, Insert);
-			break;
-		case 0x53 + RELEASED:
-			broadcast_key_event(1, 0, Delete);
-			break;
-		case 0x47 + RELEASED:
-			broadcast_key_event(1, 0, Home);
-			break;
-		case 0x4F + RELEASED:
-			broadcast_key_event(1, 0, End);
-			break;
-		case 0x49 + RELEASED:
-			broadcast_key_event(1, 0, Prior);
-			break;
-		case 0x51 + RELEASED:
-			broadcast_key_event(1, 0, Next);
-			break;
-		case 0x48 + RELEASED:
-			broadcast_key_event(1, 0, Up);
-			break;
-		case 0x4B + RELEASED:
-			broadcast_key_event(1, 0, Left);
-			break;
-		case 0x50 + RELEASED:
-			broadcast_key_event(1, 0, Down);
-			break;
-		case 0x4D + RELEASED:
-			broadcast_key_event(1, 0, Right);
-			break;
-		case 0x35 + RELEASED:
-			broadcast_key_event(1, '/', None);
+			ascii = '/';
+			sp_keys = None;
 			break;
 		}
+
+		if (sub)
+			scancode += RELEASED;
+
 		special_sc = 0;
 		update_keyboard_state(scancode, special_sc);
 		return 1;
@@ -337,23 +309,9 @@ void init_keyboard()
 	modifiers = (modifiers_t) { 0, 0, 0, 0, 0, 0, 0 }; 
 }
 
-/* This registers a pointer to the key_event function and returnes the 
-	specific index at which it's stored. */
-int register_key_pressed_callback(key_event event)
+keypress_t read_key()
 {
-	for (unsigned short i = 0; i < 256; i++)
-	{
-		if (key_pressed[i] == 0)
-		{
-			key_pressed[i] = event;
-			return i;
-		}
-	}
-	return -1;
-}
-
-/* This frees the index of the key_event. */
-void delete_key_pressed_callback(int index)
-{
-	key_pressed[index] = 0;
+	while (!KEY_PRESS);
+	KEY_PRESS = 0;
+	return (keypress_t) { ascii, sp_keys, modifiers };
 }

@@ -41,7 +41,7 @@ void terminal_setinternalcursor(unsigned char x, unsigned char y);
 void terminal_getinternalcursor(unsigned char* x, unsigned char* y);
 void terminal_writestring(const char* data);
 void terminal_writeline(const char* data);
-void terminal_putchar(char c);
+int terminal_putchar(char c);
 void terminal_clearscreen(void);
 void terminal_setcursor(bool enabled);
 void terminal_setcursorpos(int x, int y);

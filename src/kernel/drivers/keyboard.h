@@ -37,11 +37,17 @@ typedef struct
 	unsigned char shift_right : 1;
 } modifiers_t;
 
+typedef struct
+{
+	char ascii;
+	enum SPECIAL_KEYS sp;
+	modifiers_t mod;
+} keypress_t;
+
 typedef void (*key_event)(char, enum SPECIAL_KEYS, modifiers_t*);
 
 void init_keyboard();
 
-int register_key_pressed_callback(key_event event);
-void delete_key_pressed_callback(int index);
+keypress_t read_key();
 
 #endif

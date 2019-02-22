@@ -46,8 +46,10 @@ static void terminal_write(const char* data, int size)
  ************************************/
 
 //Schreibt einen Buchstaben am derzeitigen internen Cursor, falls der Buchstaben Newline (\n) ist geht er in die nächste Zeile.
-void terminal_putchar(char c) 
+int terminal_putchar(char c) 
 {
+	int scrolled = 0;
+
 	//Schreiben eines Buchstaben und Zeilenumbruch.
 	if (c == '\n')
 	{
@@ -61,6 +63,7 @@ void terminal_putchar(char c)
 		{ 
 			terminal_column = 0;
 			terminal_row++;
+			scrolled = 1;
 		}
 	}
 	
@@ -75,6 +78,8 @@ void terminal_putchar(char c)
 		}
 		memset(&vidmem[VGA_WIDTH * terminal_row * 2], 0x00, VGA_WIDTH * 2);
 	}
+
+	return scrolled;
 }
 
 //Initialisiert alle Variablen und löscht den Bildschirm

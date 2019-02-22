@@ -1,6 +1,7 @@
 #include "shell.h"
 #include "drivers/terminal.h"
 #include "drivers/keyboard.h"
+#include "drivers/floppy.h"
 
 #include "util/math.h"
 #include "util/string.h"
@@ -19,6 +20,7 @@ static unsigned char buffer_size();
 char buffer[BUFFER_SIZE];
 unsigned char cursor;
 unsigned char buffer_x, buffer_y;
+unsigned char last_redraw;
 
 int key_callback;
 
@@ -31,7 +33,14 @@ static void redraw_buffer()
 {
 	terminal_setinternalcursor(buffer_x, buffer_y);
 	for (unsigned short i = 0; i < BUFFER_SIZE; i++)
+	{
 		terminal_putchar(buffer[i]);
+		if (i >= last_redraw && buffer[i] == '\0')
+		{
+			last_redraw = i;
+			break;
+		}
+	}
 
 	terminal_setcursorpos((buffer_x + cursor) % VGA_WIDTH, buffer_y + ((cursor + buffer_x % VGA_WIDTH) / VGA_WIDTH));
 }
@@ -75,9 +84,13 @@ static unsigned char buffer_size()
 static void print_filepath()
 {
 	terminal_writestring("A:>");
+	terminal_writestring("\n\n\n\n");
 	terminal_getinternalcursor(&buffer_x, &buffer_y);
-	terminal_setcursorpos((int)buffer_x, (int)buffer_y);
+	buffer_y -= 4;
+	buffer_x += 3;
+	terminal_setcursorpos((int)buffer_x, (int)(buffer_y));
 	clear_buffer();
+	last_redraw = 0;
 }
 
 static void shell_execute()
@@ -99,6 +112,57 @@ static void shell_execute()
 			terminal_putchar(' ');
 		}
 		terminal_putchar('\n');
+	}
+	else if (strcmp(argv[0], "hexdmp") == 0)
+	{
+		unsigned char* address = (unsigned char*) parse_hex(argv[1]);
+
+		char* addr = "00000000";
+
+		for (int j = 0; j < 20; j++)
+		{
+			ulong_to_hex((unsigned long)address + j * 16, addr, 8);
+			terminal_writestring(addr);
+			terminal_writestring(" |");
+
+			for (int i = 0; i < 16; i++)
+			{
+				if (i == 8)
+					terminal_putchar(' ');
+				ulong_to_hex(address[i + j * 16], addr, 2);
+				terminal_putchar(' ');
+				terminal_writestring(addr);
+			}
+
+			terminal_writestring(" | ");
+
+			for (int i = 0; i < 16; i++)
+			{
+				if (addr[i + j * 16] == '\n')
+					terminal_putchar(' ');
+				else
+					terminal_putchar(address[i + j * 16]);
+			}
+
+			terminal_putchar('\n');
+		}
+	}
+	else if (strcmp(argv[0], "ld") == 0)
+	{
+		flpydsk_detect_drives();
+	}
+	else if (strcmp(argv[0], "read") == 0)
+	{
+		if (argc != 2)
+			terminal_writeline("Command Usage: read sector[0 - floppy length]");
+		else
+		{
+			int sector = parse_int(argv[1]);
+			if (sector < 0)
+				terminal_writeline("Command Usage: read sector[0 - floppy length]");
+			else
+				flpydsk_read_sector(sector);
+		}
 	}
 	else
 	{
@@ -203,6 +267,10 @@ void init_shell()
 	cursor = 0;
 	terminal_getcursorpos(&buffer_x, &buffer_y);
 	terminal_setcursorpos((int)buffer_x, (int)buffer_y);
-	
-	key_callback = register_key_pressed_callback(key_pressed);
+
+	for (;;)
+	{
+		keypress_t key = read_key();
+		key_pressed(key.ascii, key.sp, &key.mod);
+	}
 }
