@@ -147,21 +147,23 @@ static void shell_execute()
 			terminal_putchar('\n');
 		}
 	}
-	else if (strcmp(argv[0], "ld") == 0)
+	else if (strcmp(argv[0], "floppy") == 0)
 	{
-		flpydsk_detect_drives();
-	}
-	else if (strcmp(argv[0], "read") == 0)
-	{
-		if (argc != 2)
-			terminal_writeline("Command Usage: read sector[0 - floppy length]");
+		if (argc != 4)
+			terminal_writeline("Command Usage: floppy -r/-w sector[0 - floppy length] drive[0, 1]");
 		else
 		{
-			int sector = parse_int(argv[1]);
+			int sector = parse_int(argv[2]);
+			int drive = parse_int(argv[3]);
+
 			if (sector < 0)
-				terminal_writeline("Command Usage: read sector[0 - floppy length]");
+				terminal_writeline("Command Usage: floppy -r/-w sector[0 - floppy size] drive[0, 1]");
+			else if (drive != 0 && drive != 1)
+				terminal_writeline("Command Usage: floppy -r/-w sector[0 - floppy size] drive[0, 1]");
+			else if (strcmp(argv[1], "-r") != 0 && strcmp(argv[1], "-w") != 0)
+				terminal_writeline("Command Usage: floppy -r/-w sector[0 - floppy size] drive[0, 1]");
 			else
-				flpydsk_read_sector(sector);
+				flpydsk_read_write_sector(strcmp(argv[1], "-r") == 0 ? 0 : 1, sector, (char)drive);
 		}
 	}
 	else

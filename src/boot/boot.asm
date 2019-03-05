@@ -10,7 +10,7 @@ initfat12:  ;All in little-endian format
 	db 0x02			;Sectors per cluster (2)
 	dw 0x4800		;Reserved sectors (72)
 	db 0x02			;no. of FATs (2)
-	dw 0x0036		;dir entries (15360) -> 32 * 32 bytes * 15 sectors
+	dw 0x003C		;dir entries (15360) -> 32 * 32 bytes * 15 sectors
 	dw 0x8016		;no. of sectors (5760)
 	db 0xF0			;media type descriptor (1.44Mb or 2.88Mb Floppy Disk)
 	dw 0x0900		;no. of sectors per FAT (9)
@@ -23,9 +23,9 @@ initfat12:  ;All in little-endian format
 	db 0x00			;Drive number (0x00 = Floppy   0x80 = Hard disk)
 	db 0x00			;Reserved
 	db 0x28			;Signature (must be 0x28 or 0x29)
-	dw 0x00000000	;VolumeID (can be ignored)
-	db "2.88 Floppy";Volume Name (11 Bytes)
-	db "FAT12   "	;System Name (8 Bytes)
+	dd 0x00000000	;VolumeID (can be ignored)
+	db "yppolF 88.2";Volume Name (11 Bytes)
+	db "   21TAF"	;System Name (8 Bytes)
 
 
 boot:

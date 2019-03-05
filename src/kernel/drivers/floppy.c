@@ -5,6 +5,16 @@
 #include "../drivers/terminal.h"
 #include "../util/string.h"
 
+typedef struct
+{
+	char available;
+	char id;
+	char perpendicular;
+	char is_large_disk;
+	char datarate;
+	char sectors;
+} disk_t;
+
 //IO Port IDs
 static enum FLPYDSK_IO 
 {
@@ -87,11 +97,15 @@ static enum FLPYDSK_SECTOR_DTL
 
 static enum FLPYDSK_SECTORS_PER_TRACK
 {
+	FLPYDSK_SECTORS_PER_TRACK_9 = 9,
+	FLPYDSK_SECTORS_PER_TRACK_15 = 15,
 	FLPYDSK_SECTORS_PER_TRACK_18 = 18,
 	FLPYDSK_SECTORS_PER_TRACK_36 = 36
 };
 
 static unsigned volatile int IRQ_SET = 0;
+static disk_t drive0, drive1;
+static disk_t* current_drive;
 
 // initialize DMA to use physical address 0x21000 - 0x30000
 static void flpydsk_initialize_dma(int direction) 
@@ -182,30 +196,11 @@ static void flpydsk_check_int(unsigned char* st0, unsigned char* cyl)
 
 static void flpydsk_control_motor(unsigned char b) 
 {
-	unsigned char motor = FLPYDSK_DOR_MASK_DRIVE0_MOTOR;
-
-	/*
-	//! select the correct mask based on current drive
-	switch (_CurrentDrive) {
-
-	case 0:
-		motor = FLPYDSK_DOR_MASK_DRIVE0_MOTOR;
-		break;
-	case 1:
-		motor = FLPYDSK_DOR_MASK_DRIVE1_MOTOR;
-		break;
-	case 2:
-		motor = FLPYDSK_DOR_MASK_DRIVE2_MOTOR;
-		break;
-	case 3:
-		motor = FLPYDSK_DOR_MASK_DRIVE3_MOTOR;
-		break;
-	}
-	*/
+	unsigned char motor = current_drive->id == 0 ? FLPYDSK_DOR_MASK_DRIVE0_MOTOR : FLPYDSK_DOR_MASK_DRIVE1_MOTOR;
 
 	//! turn on or off the motor of that drive
 	if (b)
-		flpydsk_write_dor(0 /*Current Drive*/ | motor | FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA);
+		flpydsk_write_dor(current_drive->id | motor | FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA);
 	else
 		flpydsk_write_dor(FLPYDSK_DOR_MASK_RESET);
 
@@ -213,22 +208,22 @@ static void flpydsk_control_motor(unsigned char b)
 	sleep(100);
 }
 
-static void flpydsk_read_sector_imp(unsigned char head, unsigned char track, unsigned char sector) 
+static void flpydsk_read_write_sector_imp(unsigned char write, unsigned char head, unsigned char track, unsigned char sector) 
 {
 	unsigned char st0, cyl;
 
 	//! set the DMA for read transfer
-	flpydsk_initialize_dma(0);
+	flpydsk_initialize_dma(write);
 
 	//! read in a sector
-	flpydsk_send_command(FDC_CMD_READ_SECT | FDC_CMD_EXT_MULTITRACK | FDC_CMD_EXT_SKIP | FDC_CMD_EXT_DENSITY);
-	flpydsk_send_command(head << 2 | 0/*Current Drive*/);
+	flpydsk_send_command(write == 1 ? FDC_CMD_WRITE_SECT : FDC_CMD_READ_SECT | FDC_CMD_EXT_MULTITRACK | FDC_CMD_EXT_SKIP | FDC_CMD_EXT_DENSITY);
+	flpydsk_send_command(head << 2 | current_drive->id);
 	flpydsk_send_command(track);
 	flpydsk_send_command(head);
 	flpydsk_send_command(sector);
-	flpydsk_send_command(FLPYDSK_SECTOR_DTL_1024);
-	flpydsk_send_command(((sector + 1) >= FLPYDSK_SECTORS_PER_TRACK_36) ? FLPYDSK_SECTORS_PER_TRACK_36 : sector + 1);
-	flpydsk_send_command(FLPYDSK_GAP3_LENGTH_3_5);
+	flpydsk_send_command(current_drive->datarate);
+	flpydsk_send_command(((sector + 1) >= current_drive->sectors) ? current_drive->sectors : sector + 1);
+	flpydsk_send_command(current_drive->is_large_disk == 1 ? FLPYDSK_GAP3_LENGTH_5_14 : FLPYDSK_GAP3_LENGTH_3_5);
 	flpydsk_send_command(0xff);
 
 	//! wait for irq
@@ -337,7 +332,7 @@ static char flpydsk_calibrate(unsigned char drive)
 {
 	unsigned char st0, cyl;
 
-	if (drive >= 4)
+	if (drive >= 2)
 		return -2;
 
 	//! turn on the motor
@@ -371,7 +366,7 @@ static char flpydsk_seek(unsigned char cyl, unsigned char head)
 	{
 		//! send the command
 		flpydsk_send_command(FDC_CMD_SEEK);
-		flpydsk_send_command((head) << 2 | 0 /*Current Drive*/ );
+		flpydsk_send_command((head) << 2 | current_drive->id);
 		flpydsk_send_command(cyl);
 
 		//! wait for the results phase IRQ
@@ -406,14 +401,14 @@ static void flpydsk_reset()
 		flpydsk_check_int(&st0, &cyl);
 
 	//! transfer speed 500kb/s
-	flpydsk_write_ccr(FLPYDSK_SECTOR_DTL_1024);
-	flpydsk_perpendicular(1, 0);
+	flpydsk_write_ccr(current_drive->datarate);
+	flpydsk_perpendicular(drive0.perpendicular, drive1.perpendicular);
 
 	//! pass mechanical drive info. steprate=3ms, unload time=240ms, load time=16ms
 	flpydsk_drive_data(3, 16, 240, 1);
 
 	//! calibrate the disk
-	flpydsk_calibrate(0);
+	flpydsk_calibrate(current_drive->id);
 }
 
 /////////////////////
@@ -422,9 +417,9 @@ static void flpydsk_reset()
 
 void flpydsk_lba_to_chs(int lba, int *head, int *track, int *sector) 
 {
-	*head = (lba % (FLPYDSK_SECTORS_PER_TRACK_36 * 2)) / (FLPYDSK_SECTORS_PER_TRACK_36);
-	*track = lba / (FLPYDSK_SECTORS_PER_TRACK_36 * 2);
-	*sector = lba % FLPYDSK_SECTORS_PER_TRACK_36 + 1;
+	*head = (lba % (current_drive->sectors * 2)) / (current_drive->sectors);
+	*track = lba / (current_drive->sectors * 2);
+	*sector = lba % current_drive->sectors + 1;
 }
 
 void flpydsk_detect_drives()
@@ -432,28 +427,98 @@ void flpydsk_detect_drives()
 	port_byte_out(0x70, 0x10);
 	unsigned char drives = port_byte_in(0x71);
 
-	char* drive_types[8] =
+	drive0.available = 1;
+	switch ((int)drives >> 4)
 	{
-		"none",
-		"360kB 5.25\"",
-		"1.2MB 5.25\"",
-		"720kB 3.5\"",
+	case 1:
+		drive0.datarate = FLPYDSK_SECTOR_DTL_256;
+		drive0.sectors = FLPYDSK_SECTORS_PER_TRACK_9;
+		drive0.perpendicular = 0;
+		drive0.is_large_disk = 1;
+		break;
+	case 2:
+		drive0.datarate = FLPYDSK_SECTOR_DTL_512;
+		drive0.sectors = FLPYDSK_SECTORS_PER_TRACK_15;
+		drive0.perpendicular = 0;
+		drive0.is_large_disk = 1;
+		break;
+	case 3:
+		drive0.datarate = FLPYDSK_SECTOR_DTL_256;
+		drive0.sectors = FLPYDSK_SECTORS_PER_TRACK_9;
+		drive0.perpendicular = 0;
+		drive0.is_large_disk = 0;
+		break;
+	case 4:
+		drive0.datarate = FLPYDSK_SECTOR_DTL_512;
+		drive0.sectors = FLPYDSK_SECTORS_PER_TRACK_18;
+		drive0.perpendicular = 0;
+		drive0.is_large_disk = 0;
+		break;
+	case 5:
+		drive0.datarate = FLPYDSK_SECTOR_DTL_1024;
+		drive0.sectors = FLPYDSK_SECTORS_PER_TRACK_36;
+		drive0.perpendicular = 1;
+		drive0.is_large_disk = 0;
+		break;
+	default:
+		drive0.available = 0;
+		break;
+	}
 
-		"1.44MB 3.5\"",
-		"2.88MB 3.5\"",
-		"unknown type",
-		"unknown type"
-	};
-
-	terminal_writestring(" - Floppy drive 0: ");
-	terminal_writeline(drive_types[drives >> 4]);
-	terminal_writestring(" - Floppy drive 1: ");
-	terminal_writeline(drive_types[drives & 0xf]);
-
+	drive1.available = 1;
+	switch ((int)drives & 0xf)
+	{
+	case 1:
+		drive1.datarate = FLPYDSK_SECTOR_DTL_256;
+		drive1.sectors = FLPYDSK_SECTORS_PER_TRACK_9;
+		drive1.perpendicular = 0;
+		drive1.is_large_disk = 1;
+		break;
+	case 2:
+		drive1.datarate = FLPYDSK_SECTOR_DTL_512;
+		drive1.sectors = FLPYDSK_SECTORS_PER_TRACK_15;
+		drive1.perpendicular = 0;
+		drive1.is_large_disk = 1;
+		break;
+	case 3:
+		drive1.datarate = FLPYDSK_SECTOR_DTL_256;
+		drive1.sectors = FLPYDSK_SECTORS_PER_TRACK_9;
+		drive1.perpendicular = 0;
+		drive1.is_large_disk = 0;
+		break;
+	case 4:
+		drive1.datarate = FLPYDSK_SECTOR_DTL_512;
+		drive1.sectors = FLPYDSK_SECTORS_PER_TRACK_18;
+		drive1.perpendicular = 0;
+		drive1.is_large_disk = 0;
+		break;
+	case 5:
+		drive1.datarate = FLPYDSK_SECTOR_DTL_1024;
+		drive1.sectors = FLPYDSK_SECTORS_PER_TRACK_36;
+		drive1.perpendicular = 1;
+		drive1.is_large_disk = 0;
+		break;
+	default:
+		drive1.available = 0;
+		break;
+	}
 }
 
-unsigned char* flpydsk_read_sector(int sectorLBA) 
+unsigned char* flpydsk_read_write_sector(char write, int sectorLBA, char drive) 
 {
+	flpydsk_detect_drives();
+
+	if (drive != 0 && drive != 1) return 0;
+	if ((drive == 0 && drive0.available == 0) || (drive == 1 && drive1.available == 0))
+	{
+		terminal_writeline("No drive detected");
+		return;
+	}
+
+	terminal_writeline("Reset controller");
+	current_drive = drive == 0 ? &drive0 : &drive1;
+	flpydsk_reset();
+
 	//! convert LBA sector to CHS
 	int head = 0, track = 0, sector = 1;
 	flpydsk_lba_to_chs(sectorLBA, &head, &track, &sector);
@@ -471,7 +536,7 @@ unsigned char* flpydsk_read_sector(int sectorLBA)
 	terminal_writeline("Seeked track");
 
 	//! read sector and turn motor off
-	flpydsk_read_sector_imp(head, track, sector);
+	flpydsk_read_write_sector_imp(write, head, track, sector);
 	terminal_writeline("Read sector");
 	flpydsk_control_motor(0);
 	terminal_writeline("Turned off Motor");
@@ -482,8 +547,11 @@ unsigned char* flpydsk_read_sector(int sectorLBA)
 
 void init_floppy_driver(void)
 {
+	drive0.id = 0;
+	drive1.id = 1;
+	current_drive = &drive0;
 	register_interrupt_handler(IRQ6, floppy_irq);
+	flpydsk_detect_drives();
 	flpydsk_initialize_dma(0);
 	flpydsk_reset();
-	flpydsk_drive_data(13, 1, 0xf, 1);
 }
