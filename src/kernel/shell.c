@@ -166,6 +166,31 @@ static void shell_execute()
 				flpydsk_read_write_sector(strcmp(argv[1], "-r") == 0 ? 0 : 1, sector, (char)drive);
 		}
 	}
+	else if (strcmp(argv[0], "floppyt") == 0)
+	{
+		if (argc != 5 && argc != 4)
+			terminal_writeline("Command Usage: floppyt [-l] sector/track head drive");
+		else
+		{
+			char i = 1;
+			char useLBA = 0;
+
+			if (strcmp(argv[1], "-l") == 0)
+			{
+				i++;
+				useLBA = 1;
+			}
+
+			int st = parse_int(argv[i++]);
+			int head = parse_int(argv[i++]);
+			int drive = parse_int(argv[i]);
+
+			if (st < 0 || (drive != 0 && drive != 1) || (head != 0 && head != 1))
+				terminal_writeline("Command Usage: floppyt [-l] sector/track head drive");
+			else
+				flpydsk_read_track(useLBA, st, st, head, drive);
+		}
+	}
 	else
 	{
 		terminal_writeline("Unknown Command");
@@ -260,6 +285,7 @@ static void key_pressed(char ascii, enum SPECIAL_KEYS sp_keys, modifiers_t *modi
 /* Initialisiert die Shell. */
 void init_shell()
 {
+	terminal_clearscreen();
 	terminal_writeline("OwO GmbH<R> OwOS ver. 0.1");
 	terminal_writeline("    <C> OwO GmbH Sept. 2018 - Juli 2021\n");
 	

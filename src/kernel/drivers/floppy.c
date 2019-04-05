@@ -208,6 +208,87 @@ static void flpydsk_control_motor(unsigned char b)
 	sleep(100);
 }
 
+static int print_err(unsigned char* st0, unsigned char* st1, unsigned char* st2, unsigned char* rcy, unsigned char* rhe, unsigned char* rse, unsigned char* bps)
+{
+	int error = 0;
+	if (*st0 & 0xC0) 
+	{
+		char* status[] = { 0, "error", "invalid command", "drive not ready" };
+		terminal_writestring("floppy_do_sector: status = ");
+		terminal_writeline(status[*st0 >> 6]);
+		error = 1;
+	}
+	if (*st1 & 0x80) 
+	{
+		terminal_writeline("floppy_do_sector: end of cylinder");
+		error = 1;
+	}
+	if (*st0 & 0x08) 
+	{
+		terminal_writeline("floppy_do_sector: drive not ready");
+		error = 1;
+	}
+	if (*st1 & 0x20) 
+	{
+		terminal_writeline("floppy_do_sector: CRC error");
+		error = 1;
+	}
+	if (*st1 & 0x10) 
+	{
+		terminal_writeline("floppy_do_sector: controller timeout");
+		error = 1;
+	}
+	if (*st1 & 0x04) 
+	{
+		terminal_writeline("floppy_do_sector: no data found");
+		error = 1;
+	}
+	if ((*st1 | *st2) & 0x01) 
+	{
+		terminal_writeline("floppy_do_sector: no address mark found");
+		error = 1;
+	}
+	if (*st2 & 0x40) 
+	{
+		terminal_writeline("floppy_do_sector: deleted address mark");
+		error = 1;
+	}
+	if (*st2 & 0x20) 
+	{
+		terminal_writeline("floppy_do_sector: CRC error in data");
+		error = 1;
+	}
+	if (*st2 & 0x10) 
+	{
+		terminal_writeline("floppy_do_sector: wrong cylinder");
+		error = 1;
+	}
+	if (*st2 & 0x04)
+	{
+		terminal_writeline("floppy_do_sector: uPD765 sector not found");
+		error = 1;
+	}
+	if (*st2 & 0x02) 
+	{
+		terminal_writeline("floppy_do_sector: bad cylinder");
+		error = 1;
+	}
+	if (*bps != 0x2) 
+	{
+		terminal_writestring("floppy_do_sector: wanted 1024B/sector, got ");
+		char* str = "0000";
+		int_to_str((1 << (*bps + 7)), str);
+		terminal_writeline(str);
+		error = 1;
+	}
+	if (*st1 & 0x02) 
+	{
+		terminal_writeline("floppy_do_sector: not writable");
+		error = 2;
+	}
+	return error;
+}
+
 static void flpydsk_read_write_sector_imp(unsigned char write, unsigned char head, unsigned char track, unsigned char sector) 
 {
 	unsigned char st0, cyl;
@@ -239,70 +320,50 @@ static void flpydsk_read_write_sector_imp(unsigned char write, unsigned char hea
 	rse = flpydsk_read_data();
 	bps = flpydsk_read_data();
 
-	int error = 0;
+	int error = print_err(&st0, &st1, &st2, &rcy, &rhe, &rse, &bps);
 
-	if (st0 & 0xC0) {
-		char* status[] =
-		{ 0, "error", "invalid command", "drive not ready" };
-		terminal_writestring("floppy_do_sector: status = ");
-		terminal_writeline(status[st0 >> 6]);
-		error = 1;
+	flpydsk_check_int(&st0, &cyl);
+
+	if (!error) 
+	{
+		return 0;
 	}
-	if (st1 & 0x80) {
-		terminal_writeline("floppy_do_sector: end of cylinder");
-		error = 1;
+	if (error > 1) 
+	{
+		terminal_writeline("floppy_do_sector: not retrying..");
+		return -2;
 	}
-	if (st0 & 0x08) {
-		terminal_writeline("floppy_do_sector: drive not ready");
-		error = 1;
-	}
-	if (st1 & 0x20) {
-		terminal_writeline("floppy_do_sector: CRC error");
-		error = 1;
-	}
-	if (st1 & 0x10) {
-		terminal_writeline("floppy_do_sector: controller timeout");
-		error = 1;
-	}
-	if (st1 & 0x04) {
-		terminal_writeline("floppy_do_sector: no data found");
-		error = 1;
-	}
-	if ((st1 | st2) & 0x01) {
-		terminal_writeline("floppy_do_sector: no address mark found");
-		error = 1;
-	}
-	if (st2 & 0x40) {
-		terminal_writeline("floppy_do_sector: deleted address mark");
-		error = 1;
-	}
-	if (st2 & 0x20) {
-		terminal_writeline("floppy_do_sector: CRC error in data");
-		error = 1;
-	}
-	if (st2 & 0x10) {
-		terminal_writeline("floppy_do_sector: wrong cylinder");
-		error = 1;
-	}
-	if (st2 & 0x04) {
-		terminal_writeline("floppy_do_sector: uPD765 sector not found");
-		error = 1;
-	}
-	if (st2 & 0x02) {
-		terminal_writeline("floppy_do_sector: bad cylinder");
-		error = 1;
-	}
-	if (bps != 0x2) {
-		terminal_writestring("floppy_do_sector: wanted 1024B/sector, got ");
-		char* str = "0000";
-		int_to_str((1 << (bps + 7)), str);
-		terminal_writeline(str);
-		error = 1;
-	}
-	if (st1 & 0x02) {
-		terminal_writeline("floppy_do_sector: not writable");
-		error = 2;
-	}
+}
+
+static void flpydsk_read_track_imp(unsigned char head, unsigned char track)
+{
+	unsigned char st0, cyl;
+
+	//! set the DMA for read transfer
+	flpydsk_initialize_dma(0);
+
+	//! read in a sector
+	flpydsk_send_command(FDC_CMD_READ_TRACK | FDC_CMD_EXT_DENSITY);
+	flpydsk_send_command(head << 2 | current_drive->id);
+	flpydsk_send_command(track);
+	flpydsk_send_command(head);
+	flpydsk_send_command(1);
+	flpydsk_send_command(current_drive->datarate);
+	flpydsk_send_command(current_drive->sectors);
+	flpydsk_send_command(current_drive->is_large_disk == 1 ? FLPYDSK_GAP3_LENGTH_5_14 : FLPYDSK_GAP3_LENGTH_3_5);
+	flpydsk_send_command(0xff);
+
+	//! read status info
+	unsigned char st1, st2, rcy, rhe, rse, bps;
+	st0 = flpydsk_read_data();
+	st1 = flpydsk_read_data();
+	st2 = flpydsk_read_data();
+	rcy = flpydsk_read_data();
+	rhe = flpydsk_read_data();
+	rse = flpydsk_read_data();
+	bps = flpydsk_read_data();
+
+	int error = print_err(&st0, &st1, &st2, &rcy, &rhe, &rse, &bps);
 
 	flpydsk_check_int(&st0, &cyl);
 
@@ -502,6 +563,51 @@ void flpydsk_detect_drives()
 		drive1.available = 0;
 		break;
 	}
+}
+
+unsigned char* flpydsk_read_track(char useLBA, int sectorLBA, char track, char head, char drive)
+{
+	flpydsk_detect_drives();
+
+	if (drive != 0 && drive != 1) return 0;
+	if ((drive == 0 && drive0.available == 0) || (drive == 1 && drive1.available == 0))
+	{
+		terminal_writeline("No drive detected");
+		return;
+	}
+
+	terminal_writeline("Reset controller");
+	current_drive = drive == 0 ? &drive0 : &drive1;
+	flpydsk_reset();
+
+	if (useLBA == 1)
+	{
+		//! convert LBA sector to CHS
+		track = 0;
+		int sec;
+		flpydsk_lba_to_chs(sectorLBA, &head, &track, &sec);
+
+		terminal_writeline("Converted to CHS");
+	}
+
+	//! turn motor on and seek to track
+	flpydsk_control_motor(1);
+	terminal_writeline("Turned on motor");
+
+	if (flpydsk_seek(track, 0) != 0)
+		return 0;
+	if (flpydsk_seek(track, 1) != 0)
+		return 0;
+	terminal_writeline("Seeked track");
+
+	//! read sector and turn motor off
+	flpydsk_read_track_imp(head, track);
+	terminal_writeline("Read track");
+	flpydsk_control_motor(0);
+	terminal_writeline("Turned off Motor");
+
+	//! warning: this is a bit hackish
+	return (unsigned char*)DMA_ADDRESS;
 }
 
 unsigned char* flpydsk_read_write_sector(char write, int sectorLBA, char drive) 

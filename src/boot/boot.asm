@@ -7,10 +7,10 @@ initfat12:  ;All in little-endian format
 	dd 0x293A637E
 	dd 0x2D494843
 	dw 0x0004		;Bytes per sector (1024)
-	db 0x02			;Sectors per cluster (2)
+	db 0x01			;Sectors per cluster (1)
 	dw 0x4800		;Reserved sectors (72)
 	db 0x02			;no. of FATs (2)
-	dw 0x003C		;dir entries (15360) -> 32 * 32 bytes * 15 sectors
+	dw 0x0002		;dir entries (512) -> 32 * 16 sectors
 	dw 0x8016		;no. of sectors (5760)
 	db 0xF0			;media type descriptor (1.44Mb or 2.88Mb Floppy Disk)
 	dw 0x0900		;no. of sectors per FAT (9)
