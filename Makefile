@@ -2,7 +2,7 @@
 #$< first dependency
 #$^all dependencies
 
-CC 	= gcc -m32 -fno-pie
+CC 	= gcc -m32 -fno-pie -g
 LD 	= ld -m elf_i386
 GDB = gdb
 
@@ -23,13 +23,13 @@ debug: buildrepo bin/os.bin bin/kernel.elf
 
 #Kernel assemble
 build/kernel.bin: build/kernel_entry.o ${OBJ} build/src/cpu/interrupts.o
-	${LD} -o $@ -Ttext 0x9000 $^ --oformat binary
+	${LD} -o $@ -Ttext 0x8000 $^ --oformat binary
 
 bin/kernel.elf: build/kernel_entry.o ${OBJ} build/src/cpu/interrupts.o
-	${LD} -o $@ -Ttext 0x9000 $^
+	${LD} -o $@ -Ttext 0x8000 $^
 
 build/%.o: %.c ${HEADERS}
-	${CC}  -Wall -Wextra -g -ffreestanding -masm=intel -c $< -o $@
+	${CC}  -Wall -Wextra -ffreestanding -masm=intel -c $< -o $@
 
 build/src/cpu/interrupts.o: src/cpu/interrupts.asm
 	nasm $< -f elf -o $@ -I src/boot/

@@ -1,5 +1,5 @@
 [org 0x7C00]					;Setze den allgemeinen Offset auf 0x7C00 (Anfang des Bootsektors).
-KERNEL_OFFSET equ 0x9000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile).
+KERNEL_OFFSET equ 0x8000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile).
 
 initfat12:  ;All in little-endian format
 	jmp short 0x3C
@@ -8,7 +8,7 @@ initfat12:  ;All in little-endian format
 	dd 0x2D494843
 	dw 0x0004		;Bytes per sector (1024)
 	db 0x01			;Sectors per cluster (1)
-	dw 0x4800		;Reserved sectors (72)
+	dw 0x6C00		;Reserved sectors (108)
 	db 0x02			;no. of FATs (2)
 	dw 0x0002		;dir entries (512) -> 32 * 16 sectors
 	dw 0x8016		;no. of sectors (5760)
@@ -31,7 +31,7 @@ initfat12:  ;All in little-endian format
 boot:
 	cli
 	mov [BOOTDRIVE], dl			;Spechere die ID der Floppy Disk in BOOTDRIVE.
-	mov bp, 0x8000				;Setze den Stack auf 0x9000.
+	mov bp, 0x7F00				;Setze den Stack auf 0x9000.
 	mov sp, bp
 
 	mov bx, MSG_WELCOME			;Schreibe die Wilkommensnachricht.
@@ -46,7 +46,7 @@ boot:
 %include "print.asm"
 %include "diskload.asm"
 %include "gdt.asm"
-%include "print32.asm"
+[bits 32]
 %include "start32.asm"
 
 [bits 16]
@@ -55,7 +55,7 @@ load_kernel:					;Lade den Kernel.
     call printline
 
 	xor cx, cx
-	mov bx, KERNEL_OFFSET		;Lade 35 Sektoren der Floppy Disk beim Kernel Offset.
+	mov bx, KERNEL_OFFSET								;Lade 35 Sektoren der Floppy Disk beim Kernel Offset.
 	mov ch, 0x00
 	mov cl, 0x02
     mov dh, 35
@@ -66,33 +66,54 @@ load_kernel:					;Lade den Kernel.
 	mov bx, KERNEL_OFFSET + 35 * 512		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
 	mov ch, 0x01
 	mov cl, 0x01
-    mov dh, 20
+    mov dh, 29
     mov dl, [BOOTDRIVE]
     call diskload
 
-	;mov dx, 0x1000
-	;mov es, dx
+	mov ax, 0x1000
+	mov es, ax
+
+	xor cx, cx
+	mov bx, 0		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
+	mov ch, 0x01
+	mov cl, 30
+    mov dh, 7
+    mov dl, [BOOTDRIVE]
+    call diskload
+
+	xor cx, cx
+	mov bx, 7 * 512		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
+	mov ch, 0x02
+	mov cl, 0x01
+    mov dh, 36
+    mov dl, [BOOTDRIVE]
+    call diskload
+
 	;xor cx, cx
-	;mov bx, 0x1E00		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
+	;mov bx, (35 + 36) * 512		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
 	;mov ch, 0x02
-	;mov cl, 0x00
+	;mov cl, 0x01
     ;mov dh, 36
     ;mov dl, [BOOTDRIVE]
     ;call diskload
+	
+	mov dx, 0x0
+	mov es, dx
+
+	mov bx, MSG_LOADED_KERNEL		;Schreibe das der Kernel geladen wird.
+    call printline
 
     ret
 
 [bits 32]
 BEGIN_PM:						;Starte den Kernel.
-    mov ebx, MSG_PM				;Schreibe dass der Computer den Protected Mode erreicht hat.
-    call print_pm
     call KERNEL_OFFSET			;Starte die externe Funktion main() des Kernels beim KERNEL_OFFSET durch kernel_entry.asm welches am Anfang steht.
     jmp $						;Hänge für immer falls der Kernel returned
 
 BOOTDRIVE db 0					;Variable für die ID der Floppy Disk
 MSG_WELCOME db "Booting OwOS in 16-Bit Real Mode...", 0			;Nachrichten zum ausgeben.
-MSG_PM db "Booted 32-bit Protected Mode!", 0
 MSG_LOAD_KERNEL db "Loading Kernel...", 0
+MSG_LOADED_KERNEL db "Loaded Kernel...", 0
 
 times 510 -( $ - $$ ) db 0		;Fülle den Rest des Bootsektors mit 0 und schreibe am Ende die Kennzeichnungsbytes 0xAA55
 dw 0xAA55

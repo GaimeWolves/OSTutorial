@@ -113,7 +113,7 @@ static void shell_execute()
 		}
 		terminal_putchar('\n');
 	}
-	else if (strcmp(argv[0], "hexdmp") == 0)
+	else if (strcmp(argv[0], "hexdump") == 0)
 	{
 		unsigned char* address = (unsigned char*) parse_hex(argv[1]);
 
@@ -138,7 +138,7 @@ static void shell_execute()
 
 			for (int i = 0; i < 16; i++)
 			{
-				if (addr[i + j * 16] == '\n')
+				if (address[i + j * 16] <= 32)
 					terminal_putchar(' ');
 				else
 					terminal_putchar(address[i + j * 16]);
@@ -172,7 +172,7 @@ static void shell_execute()
 			terminal_writeline("Command Usage: floppyt [-l] sector/track head drive");
 		else
 		{
-			char i = 1;
+			int i = 1;
 			char useLBA = 0;
 
 			if (strcmp(argv[1], "-l") == 0)
@@ -185,10 +185,13 @@ static void shell_execute()
 			int head = parse_int(argv[i++]);
 			int drive = parse_int(argv[i]);
 
+			char* offset = 0;
+			char* ste = 0;
+
 			if (st < 0 || (drive != 0 && drive != 1) || (head != 0 && head != 1))
 				terminal_writeline("Command Usage: floppyt [-l] sector/track head drive");
 			else
-				flpydsk_read_track(useLBA, st, st, head, drive);
+				flpydsk_read_track(useLBA, st, st, head, drive, ste, offset);
 		}
 	}
 	else

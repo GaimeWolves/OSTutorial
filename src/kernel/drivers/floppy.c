@@ -16,7 +16,7 @@ typedef struct
 } disk_t;
 
 //IO Port IDs
-static enum FLPYDSK_IO 
+enum FLPYDSK_IO 
 {
 	FLPYDSK_DOR = 0x3f2,
 	FLPYDSK_MSR = 0x3f4,
@@ -25,7 +25,7 @@ static enum FLPYDSK_IO
 };
 
 //Masks for DOR Command Assembly (increased readability)
-static enum FLPYDSK_DOR_MASK 
+enum FLPYDSK_DOR_MASK 
 {
 	FLPYDSK_DOR_MASK_DRIVE0 = 0,		//00000000
 	FLPYDSK_DOR_MASK_DRIVE1 = 1,		//00000001
@@ -40,7 +40,7 @@ static enum FLPYDSK_DOR_MASK
 };
 
 //Status Register Masks
-static enum FLPYDSK_MSR_MASK 
+enum FLPYDSK_MSR_MASK 
 {
 	FLPYDSK_MSR_MASK_DRIVE1_POS_MODE = 1,	//00000001
 	FLPYDSK_MSR_MASK_DRIVE2_POS_MODE = 2,	//00000010
@@ -53,7 +53,7 @@ static enum FLPYDSK_MSR_MASK
 };
 
 //Floppy Disk Commands (Lower Bytes)
-static enum FLPYDSK_CMD 
+enum FLPYDSK_CMD 
 {
 	FDC_CMD_READ_TRACK = 2,
 	FDC_CMD_SPECIFY = 3,
@@ -71,7 +71,7 @@ static enum FLPYDSK_CMD
 };
 
 //Floppy Disk Command Attributes
-static enum FLPYDSK_CMD_EXT 
+enum FLPYDSK_CMD_EXT 
 {
 	FDC_CMD_EXT_SKIP = 0x20,		//00100000
 	FDC_CMD_EXT_DENSITY = 0x40,		//01000000
@@ -79,7 +79,7 @@ static enum FLPYDSK_CMD_EXT
 };
 
 //Space between sectors
-static enum FLPYDSK_GAP3_LENGTH 
+enum FLPYDSK_GAP3_LENGTH 
 {
 	FLPYDSK_GAP3_LENGTH_STD = 42,
 	FLPYDSK_GAP3_LENGTH_5_14 = 32,
@@ -87,7 +87,7 @@ static enum FLPYDSK_GAP3_LENGTH
 };
 
 //Bytes per sector
-static enum FLPYDSK_SECTOR_DTL 
+enum FLPYDSK_SECTOR_DTL 
 {
 	FLPYDSK_SECTOR_DTL_128 = 0,
 	FLPYDSK_SECTOR_DTL_256 = 1,
@@ -95,7 +95,7 @@ static enum FLPYDSK_SECTOR_DTL
 	FLPYDSK_SECTOR_DTL_1024 = 3
 };
 
-static enum FLPYDSK_SECTORS_PER_TRACK
+enum FLPYDSK_SECTORS_PER_TRACK
 {
 	FLPYDSK_SECTORS_PER_TRACK_9 = 9,
 	FLPYDSK_SECTORS_PER_TRACK_15 = 15,
@@ -289,7 +289,7 @@ static int print_err(unsigned char* st0, unsigned char* st1, unsigned char* st2,
 	return error;
 }
 
-static void flpydsk_read_write_sector_imp(unsigned char write, unsigned char head, unsigned char track, unsigned char sector) 
+static int flpydsk_read_write_sector_imp(unsigned char write, unsigned char head, unsigned char track, unsigned char sector) 
 {
 	unsigned char st0, cyl;
 
@@ -324,15 +324,12 @@ static void flpydsk_read_write_sector_imp(unsigned char write, unsigned char hea
 
 	flpydsk_check_int(&st0, &cyl);
 
-	if (!error) 
-	{
-		return 0;
-	}
 	if (error > 1) 
 	{
 		terminal_writeline("floppy_do_sector: not retrying..");
 		return -2;
 	}
+	return 0;
 }
 
 static void flpydsk_read_track_imp(unsigned char head, unsigned char track)
@@ -367,12 +364,9 @@ static void flpydsk_read_track_imp(unsigned char head, unsigned char track)
 
 	flpydsk_check_int(&st0, &cyl);
 
-	if (!error) {
-		return 0;
-	}
-	if (error > 1) {
+	if (error > 1) 
+	{
 		terminal_writeline("floppy_do_sector: not retrying..");
-		return -2;
 	}
 }
 
@@ -489,7 +483,7 @@ void flpydsk_detect_drives()
 	unsigned char drives = port_byte_in(0x71);
 
 	drive0.available = 1;
-	switch ((int)drives >> 4)
+	switch (drives >> 4)
 	{
 	case 1:
 		drive0.datarate = FLPYDSK_SECTOR_DTL_256;
@@ -527,7 +521,7 @@ void flpydsk_detect_drives()
 	}
 
 	drive1.available = 1;
-	switch ((int)drives & 0xf)
+	switch (drives & 0xf)
 	{
 	case 1:
 		drive1.datarate = FLPYDSK_SECTOR_DTL_256;
@@ -565,7 +559,7 @@ void flpydsk_detect_drives()
 	}
 }
 
-unsigned char* flpydsk_read_track(char useLBA, int sectorLBA, char track, char head, char drive)
+unsigned char* flpydsk_read_track(char useLBA, int sectorLBA, int track, int head, int drive, char* sectors_to_end, char* offset)
 {
 	flpydsk_detect_drives();
 
@@ -573,7 +567,21 @@ unsigned char* flpydsk_read_track(char useLBA, int sectorLBA, char track, char h
 	if ((drive == 0 && drive0.available == 0) || (drive == 1 && drive1.available == 0))
 	{
 		terminal_writeline("No drive detected");
-		return;
+		return 0;
+	}
+
+	if (useLBA)
+	{
+		if (drive == 0)
+		{
+			*sectors_to_end = sectorLBA % drive0.sectors;
+			*offset = drive0.sectors - *sectors_to_end;
+		}
+		else
+		{
+			*sectors_to_end = sectorLBA % drive1.sectors;
+			*offset = drive1.sectors - *sectors_to_end;
+		}
 	}
 
 	terminal_writeline("Reset controller");
@@ -618,7 +626,7 @@ unsigned char* flpydsk_read_write_sector(char write, int sectorLBA, char drive)
 	if ((drive == 0 && drive0.available == 0) || (drive == 1 && drive1.available == 0))
 	{
 		terminal_writeline("No drive detected");
-		return;
+		return 0;
 	}
 
 	terminal_writeline("Reset controller");

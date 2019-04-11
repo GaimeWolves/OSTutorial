@@ -50,8 +50,8 @@ void uint_to_bin(unsigned int num, char* str, int len)
 
 	do
 	{
-		str[i++] = ((num >> i) & 1) + '0';
-	} while(i < len);
+		str[i] = ((num >> i) & 1) + '0';
+	} while(++i < len);
 	str[i] = '\0';
 	
 	reverse(str);

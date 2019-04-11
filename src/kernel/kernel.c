@@ -16,6 +16,5 @@ void main()
 	init_timer(100);
 	init_keyboard();
 	init_floppy_driver();
-	init_fs();
 	init_shell();
 }
