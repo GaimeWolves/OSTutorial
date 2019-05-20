@@ -8,7 +8,6 @@
 
 static void redraw_buffer();
 static void insert(unsigned char, char);
-static void key_pressed(char, enum SPECIAL_KEYS, modifiers_t*);
 static void clear_buffer(void);
 static void print_filepath();
 static void shell_execute();

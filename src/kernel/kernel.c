@@ -5,7 +5,6 @@
 #include "shell.h"
 #include "drivers/floppy.h"
 #include "../cpu/timer.h"
-#include "fs.h"
 
 void main() 
 {
