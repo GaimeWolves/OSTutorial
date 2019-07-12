@@ -1,119 +1,242 @@
-[org 0x7C00]					;Setze den allgemeinen Offset auf 0x7C00 (Anfang des Bootsektors).
-KERNEL_OFFSET equ 0x8000		;Speichere wo der Kernel geladen wird (Selbe Adresse wie im Linker Befehl der Makefile).
+[bits 16]
+[org 0x0]					;Setze den allgemeinen Offset auf 0x7C00 (Anfang des Bootsektors).
 
-initfat12:  ;All in little-endian format
-	jmp short 0x3C
-	nop
-	dd 0x293A637E
-	dd 0x2D494843
-	dw 0x0004		;Bytes per sector (1024)
-	db 0x01			;Sectors per cluster (1)
-	dw 0x6C00		;Reserved sectors (108)
-	db 0x02			;no. of FATs (2)
-	dw 0x0002		;dir entries (512) -> 32 * 16 sectors
-	dw 0x8016		;no. of sectors (5760)
-	db 0xF0			;media type descriptor (1.44Mb or 2.88Mb Floppy Disk)
-	dw 0x0900		;no. of sectors per FAT (9)
-	dw 0x2400		;no. of sectors per track (36)
-	dw 0x0200		;no. of heads / sides of media (2)
-	dd 0x00000000	;no. of hidden sectors (0)
-	dd 0x00000000	;Large sector count (0) not used because sector count <= 65535
+start:
+	jmp boot
 
-	;Extended Boot record
-	db 0x00			;Drive number (0x00 = Floppy   0x80 = Hard disk)
-	db 0x00			;Reserved
-	db 0x28			;Signature (must be 0x28 or 0x29)
-	dd 0x00000000	;VolumeID (can be ignored)
-	db "yppolF 88.2";Volume Name (11 Bytes)
-	db "   21TAF"	;System Name (8 Bytes)
+TIMES 03h-$+start DB 0
 
+bpbOEM:					DB "OwOS 0.1"
+bpbBytesPerSector:  	DW 512
+bpbSectorsPerCluster: 	DB 1
+bpbReservedSectors: 	DW 1
+bpbNumberOfFATs: 	    DB 2
+bpbRootEntries: 	    DW 224
+bpbTotalSectors: 	    DW 2880
+bpbMedia: 	            DB 0xF0
+bpbSectorsPerFAT: 	    DW 9
+bpbSectorsPerTrack: 	DW 18
+bpbHeadsPerCylinder: 	DW 2
+bpbHiddenSectors: 	    DD 0
+bpbTotalSectorsBig:     DD 0
+bsDriveNumber: 	        DB 0
+bsUnused: 	            DB 0
+bsExtBootSignature: 	DB 0x29
+bsSerialNumber:	        DD 0xa0a1a2a3
+bsVolumeLabel: 	        DB "MOS FLOPPY "
+bsFileSystem: 	        DB "FAT12   "
+
+print:
+		lodsb			; load next byte from string from SI to AL
+		or	al, al		; Does AL=0?
+		jz	printdone	; If yes then return
+		mov	ah,	0eh		; Else print char
+		int	10h
+		jmp	print		; Repeat until null terminator found
+printdone:
+		ret				; we are done, so return
+
+
+; CX > Number of sectors to read
+; AX > Starting sector
+; ES:BX > Buffer to read to
+read_sectors:
+	.main_read:
+		mov     di, 0x0005                          ; five retries for error
+	.sectorloop:
+		push    ax
+		push    bx
+		push    cx
+		call    LBAtoCHS                            ; convert starting sector to CHS
+		mov     ah, 0x02                            ; BIOS read sector
+		mov     al, 0x01                            ; read one sector
+		mov     ch, BYTE [absoluteTrack]            ; track
+		mov     cl, BYTE [absoluteSector]           ; sector
+		mov     dh, BYTE [absoluteHead]             ; head
+		mov     dl, BYTE [bsDriveNumber]            ; drive
+		int     0x13                                ; invoke BIOS
+		jnc     .readsuccess                        ; test for read error
+		xor     ax, ax                              ; BIOS reset disk
+		int     0x13                                ; invoke BIOS
+		dec     di                                  ; decrement error counter
+		pop     cx
+		pop     bx
+		pop     ax
+		jnz     .sectorloop                         ; attempt to read again
+		int     0x18
+	.readsuccess:
+		mov     si, msgProgress
+		call    print
+		pop     cx
+		pop     bx
+		pop     ax
+		add     bx, WORD [bpbBytesPerSector]		; queue next buffer
+		inc     ax                                  ; queue next sector
+		loop    .main_read                          ; read next sector
+		ret
+
+CHStoLBA:
+		sub     ax, 0x0002                          ; zero base cluster number
+		xor     cx, cx
+		mov     cl, BYTE [bpbSectorsPerCluster]     ; convert byte to word
+		mul     cx
+		add     ax, WORD [datasector]               ; base data sector
+		ret
+
+LBAtoCHS:
+		xor     dx, dx                              ; prepare dx:ax for operation
+		div     WORD [bpbSectorsPerTrack]           ; calculate
+		inc     dl                                  ; adjust for sector 0
+		mov     BYTE [absoluteSector], dl
+		xor     dx, dx                              ; prepare dx:ax for operation
+		div     WORD [bpbHeadsPerCylinder]          ; calculate
+		mov     BYTE [absoluteHead], dl
+		mov     BYTE [absoluteTrack], al
+		ret
 
 boot:
-	cli
-	mov [BOOTDRIVE], dl			;Spechere die ID der Floppy Disk in BOOTDRIVE.
-	mov bp, 0x7F00				;Setze den Stack auf 0x9000.
-	mov sp, bp
+		;Set segment registers
+		cli						;disable interrupts
+		mov     ax, 0x07C0		;setup registers to point to our segment
+		mov     ds, ax
+		mov     es, ax
+		mov     fs, ax
+		mov     gs, ax
+		
+		;Set stack
+		mov     ax, 0x0000
+		mov     ss, ax
+		mov     sp, 0xFFFF
+		mov		bp, 0xFFFF
+		sti						 ;enable interrupts
 
-	mov bx, MSG_WELCOME			;Schreibe die Wilkommensnachricht.
-	call printline
+		;Loading message
+		mov     si, msgLoading
+		call    print
 
-	call load_kernel			;Lade den Kernel.
-	call init_pm				;Starte den Kernel.
+read_root:
+		xor     cx, cx
+		xor     dx, dx
+		mov     ax, 0x0020							;32 byte directory entry
+		mul     WORD [bpbRootEntries]				;total size of directory
+		div     WORD [bpbBytesPerSector]			;sectors used by directory
+		xchg    ax, cx
+          
+		mov     al, BYTE [bpbNumberOfFATs]            ; number of FATs
+		mul     WORD [bpbSectorsPerFAT]               ; sectors used by FATs
+		add     ax, WORD [bpbReservedSectors]         ; adjust for bootsector
+		mov     WORD [datasector], ax                 ; base of root directory
+		add     WORD [datasector], cx
+          
+		mov     bx, 0x0200                            ; copy root dir above bootcode
+		call    read_sectors
+		
+read_dir:
+		mov     cx, WORD [bpbRootEntries]				; load loop counter
+		mov     di, 0x0200								; locate first root entry
+	.dir_loop:
+		push    cx
+		mov     cx, 0x000B								; eleven character name
+		mov     si, Filename							; image name to find
+		push    di
+		rep  cmpsb										; test for entry match
+		pop     di
+		je      load_fat
+		pop     cx
+		add     di, 0x0020								; queue next directory entry
+		loop    .dir_loop
+		jmp     failure
 
-	jmp $						;Falls der Kernel doch returned (was er nicht sollte) hänge für immer.
 
-;Inkludiere alle Hilfsroutinen
-%include "print.asm"
-%include "diskload.asm"
-%include "gdt.asm"
-[bits 32]
-%include "start32.asm"
+load_fat:
+		;Save starting sector of file
+		mov     si, msgNewline
+		call    print
+		mov     dx, WORD [di + 0x001A]
+		mov     WORD [cluster], dx                  ; file's first cluster
+          
+		;CX > Size of FATs
+		xor     ax, ax
+		mov     al, BYTE [bpbNumberOfFATs]          ; number of FATs
+		mul     WORD [bpbSectorsPerFAT]             ; sectors used by FATs
+		mov     cx, ax
 
-[bits 16]
-load_kernel:					;Lade den Kernel.
-	mov bx, MSG_LOAD_KERNEL		;Schreibe das der Kernel geladen wird.
-    call printline
+		;AX > Location of FATs
+		mov     ax, WORD [bpbReservedSectors]       ; adjust for bootsector
+          
+		;Read FAT
+		mov     bx, 0x0200                          ; copy FAT above bootcode
+		call    read_sectors
 
-	xor cx, cx
-	mov bx, KERNEL_OFFSET								;Lade 35 Sektoren der Floppy Disk beim Kernel Offset.
-	mov ch, 0x00
-	mov cl, 0x02
-    mov dh, 35
-    mov dl, [BOOTDRIVE]
-    call diskload
+		;Initialize file location
+		mov     si, msgNewline
+		call    print
+		mov     ax, 0x0050
+		mov     es, ax
+		mov     bx, 0x0000                          ; destination for image
+		push    bx
 
-	xor cx, cx
-	mov bx, KERNEL_OFFSET + 35 * 512		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
-	mov ch, 0x01
-	mov cl, 0x01
-    mov dh, 29
-    mov dl, [BOOTDRIVE]
-    call diskload
+load_file:    
+		mov     ax, WORD [cluster]                  ; cluster to read
+		pop     bx                                  ; buffer to read into
+		call    CHStoLBA	                        ; convert cluster to LBA
+		xor     cx, cx
+		mov     cl, BYTE [bpbSectorsPerCluster]     ; sectors to read
+		call    read_sectors
+		push    bx
+          
+		;Compute next cluster   
+		mov     ax, WORD [cluster]                  ; identify current cluster
+		mov     cx, ax                              ; copy current cluster
+		mov     dx, ax                              ; copy current cluster
+		shr     dx, 0x0001                          ; divide by two
+		add     cx, dx                              ; sum for (3/2)
+		mov     bx, 0x0200                          ; location of FAT in memory
+		add     bx, cx                              ; index into FAT
+		mov     dx, WORD [bx]                       ; read two bytes from FAT
+		test    ax, 0x0001
+		jnz     .odd_cluster
+          
+	.even_cluster: 
+		and     dx, 0000111111111111b               ; take low twelve bits
+		jmp     .done
+         
+	.odd_cluster:    
+		shr     dx, 0x0004                          ; take high twelve bits
+          
+	.done: 
+		mov     WORD [cluster], dx                  ; store new cluster
+		cmp     dx, 0x0FF0                          ; test for end of file
+		jb      load_file
+          
+done:   
+		mov     si, msgNewline
+		call    print
+		mov		si, msgDone
+		call	print	
+		push    WORD 0x0050
+		push    WORD 0x0000
+		retf					;Essentially far call to 0x0050:0x0000
+          
+failure:  
+		mov     si, msgFailure
+		call    print
+		mov     ah, 0x00
+		int     0x16                                ; await keypress
+		int     0x19                                ; warm boot computer
+     
+absoluteSector:	db 0x00
+absoluteHead:	db 0x00
+absoluteTrack:	db 0x00
 
-	mov ax, 0x1000
-	mov es, ax
+datasector:		dw 0x0000
+cluster:		dw 0x0000
+Filename:		db "KRNLDR  SYS"
+msgLoading:		db 0x0D, 0x0A, "Loading Boot Image ", 0x0D, 0x0A, 0x00
+msgNewline:		db 0x0D, 0x0A, 0x00
+msgProgress:	db ".", 0x00
+msgDone:		db "Done", 0x0D, 0x0A, 0x00
+msgFailure:		db 0x0D, 0x0A, "ERROR : Press Any Key to Reboot", 0x0D, 0x0A, 0x00
 
-	xor cx, cx
-	mov bx, 0		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
-	mov ch, 0x01
-	mov cl, 30
-    mov dh, 7
-    mov dl, [BOOTDRIVE]
-    call diskload
-
-	xor cx, cx
-	mov bx, 7 * 512		;Lade 36 Sektoren der Floppy Disk beim Kernel Offset.
-	mov ch, 0x02
-	mov cl, 0x01
-    mov dh, 36
-    mov dl, [BOOTDRIVE]
-    call diskload
-
-	;xor cx, cx
-	;mov bx, (35 + 36) * 512		;Lade 32 Sektoren der Floppy Disk beim Kernel Offset.
-	;mov ch, 0x02
-	;mov cl, 0x01
-    ;mov dh, 36
-    ;mov dl, [BOOTDRIVE]
-    ;call diskload
-	
-	mov dx, 0x0
-	mov es, dx
-
-	mov bx, MSG_LOADED_KERNEL		;Schreibe das der Kernel geladen wird.
-    call printline
-
-    ret
-
-[bits 32]
-BEGIN_PM:						;Starte den Kernel.
-    call KERNEL_OFFSET			;Starte die externe Funktion main() des Kernels beim KERNEL_OFFSET durch kernel_entry.asm welches am Anfang steht.
-    jmp $						;Hänge für immer falls der Kernel returned
-
-BOOTDRIVE db 0					;Variable für die ID der Floppy Disk
-MSG_WELCOME db "Booting OwOS in 16-Bit Real Mode...", 0			;Nachrichten zum ausgeben.
-MSG_LOAD_KERNEL db "Loading Kernel...", 0
-MSG_LOADED_KERNEL db "Loaded Kernel...", 0
-
-times 510 -( $ - $$ ) db 0		;Fülle den Rest des Bootsektors mit 0 und schreibe am Ende die Kennzeichnungsbytes 0xAA55
+times 510 - ($-$$) db 0						; We have to be 512 bytes. Clear the rest of the bytes with 0 
 dw 0xAA55

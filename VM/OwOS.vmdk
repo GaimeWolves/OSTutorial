@@ -1,0 +1,20 @@
+# Disk DescriptorFile
+version=1
+encoding="windows-1252"
+CID=fffffffe
+parentCID=ffffffff
+createType="twoGbMaxExtentSparse"
+
+# Extent description
+RW 2097152 SPARSE "OwOS-s001.vmdk"
+
+# The Disk Data Base 
+#DDB
+
+ddb.adapterType = "ide"
+ddb.geometry.cylinders = "2080"
+ddb.geometry.heads = "16"
+ddb.geometry.sectors = "63"
+ddb.longContentID = "4891a871a401a9f637c731cefffffffe"
+ddb.uuid = "60 00 C2 94 38 bd 74 bf-0e 6d 4f 36 3b b2 c4 46"
+ddb.virtualHWVersion = "16"

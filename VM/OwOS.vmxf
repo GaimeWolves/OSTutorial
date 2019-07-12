@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<Foundry>
+<VM>
+<VMId type="string">52 a4 e8 6a 8e 2b 24 1e-61 64 6f d5 61 90 b1 ae</VMId>
+<ClientMetaData>
+<clientMetaDataAttributes/>
+<HistoryEventList/></ClientMetaData>
+<vmxPathName type="string">OwOS.vmx</vmxPathName></VM></Foundry>
