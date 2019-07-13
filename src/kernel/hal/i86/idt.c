@@ -35,12 +35,14 @@ idt_descriptor_t* get_ir(uint32_t i)
 	if (i > MAX_INTERRUPTS)
 		return 0;
 
-	return &idt[i];
+	return &idt[i] - 0x06; //Account for C function call stack shenanigans (Code starts 6 bytes later)
 }
 
 int install_ir(uint32_t i, uint8_t flags, uint16_t selector, IRQ_HANDLER irq)
 {
 	if (i > MAX_INTERRUPTS || !irq) return -1;
+
+	irq = irq + 0x06; //Account for C function call stack shenanigans (Code starts 6 bytes later)
 
 	idt[i].base_lo = (uint16_t)((uint32_t)&(*irq) & 0xFFFF);
 	idt[i].selector = selector;

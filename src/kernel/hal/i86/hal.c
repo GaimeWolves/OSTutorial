@@ -18,7 +18,7 @@ int __attribute__((__cdecl__)) hal_init()
 	cpu_init();
 	pic_init(0x20, 0x28);
 	pit_init();
-	pit_start_counter(1000, PIT_OCW_COUNTER_0, PIT_OCW_MODE_SQUAREWAVEGEN);
+	pit_start_counter(10, PIT_OCW_COUNTER_0, PIT_OCW_MODE_SQUAREWAVEGEN);
 
 #ifdef _DEBUG
 	debug_print_dstring("[i86 HAL]: HAL initialization finished.\n");

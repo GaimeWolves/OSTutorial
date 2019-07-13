@@ -19,12 +19,12 @@ static bool is_init = false;
 
 void __attribute__((__cdecl__)) pit_irq()
 {
-	INT_INIT
+	int_init
 
 	ticks++;
 
 	int_done(0);
-	INT_EXIT
+	int_exit
 }
 
 void pit_send_command(uint8_t cmd)

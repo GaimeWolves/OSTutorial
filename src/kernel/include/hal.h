@@ -3,10 +3,14 @@
 
 #include <stdint.h>
 
+#define int_init()
+#define int_exit()
+
 #ifdef I86
-#define INT_INIT \
-__asm__("add esp, 0x8"); \
-__asm__("pop ebp"); \
+#undef int_init
+#undef int_exit
+
+#define int_init \
 __asm__("pusha"); \
 __asm__("mov ax, ds"); \
 __asm__("push eax"); \
@@ -16,7 +20,7 @@ __asm__("mov es, ax"); \
 __asm__("mov fs, ax"); \
 __asm__("mov gs, ax");
 
-#define INT_EXIT \
+#define int_exit \
 __asm__("pop ebx"); \
 __asm__("mov ds, bx"); \
 __asm__("mov es, bx"); \
