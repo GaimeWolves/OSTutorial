@@ -18,13 +18,22 @@ HAL_I86_OBJ = $(patsubst %.c,build/%.o,$(HAL_I86_C_SRC))
 
 all: buildrepo bin/boot.bin bin/KRNLDR.SYS bin/KRNL.SYS
 
+floppy.img: clean buildrepo bin/boot.bin bin/KRNLDR.SYS bin/KRNL.SYS
+	mkfs.msdos -F 12 -C /tmp/floppy.img 1440 
+	sudo mount /tmp/floppy.img /mnt/floppy
+	sudo cp bin/KRNLDR.SYS /mnt/floppy/KRNLDR.SYS
+	sudo cp bin/KRNL.SYS /mnt/floppy/KRNL.SYS
+	sudo umount /mnt/floppy
+	mv /tmp/floppy.img bin/floppy.img
+	dd if=bin/boot.bin of=bin/floppy.img bs=512 seek=0 count=1 conv=notrunc
+
 run: buildrepo bin/boot.bin
-	qemu-system-i386 -boot a -fda bin/os.bin
+	qemu-system-i386 -boot a -fda bin/kernel.img
 
-debug: buildrepo bin/boot.bin
-	qemu-system-i386 -s -fda bin/boot.bin -no-reboot &
+debug:
+	qemu-system-i386 -s -S -fda bin/floppy.img -no-reboot &
 	${GDB} -ex "target remote localhost:1234" -ex "symbol-file bin/kernel.elf"
-
+	
 build/%.o: src/boot/%.asm
 	nasm $< -f elf -o $@ -I src/boot/
 
@@ -38,7 +47,7 @@ bin/KRNLDR.SYS: build/krnldr.bin
 	cat $^ > $@
 
 build/kernel.bin: build/src/kernel/entry.o ${KERNEL_OBJ} bin/stdlib.lib bin/hal_i86.lib
-	${LD} -e entry -o $@ -Ttext 0x100000 build/src/kernel/entry.o ${KERNEL_OBJ} --oformat binary -Lbin -l:stdlib.lib -l:hal_i86.lib
+	${LD} -e entry -o $@ -Ttext 0x100000 build/src/kernel/entry.o ${KERNEL_OBJ} -Lbin -l:stdlib.lib -l:hal_i86.lib
 	${LD} -e entry -o bin/kernel.elf -Ttext 0x100000 build/src/kernel/entry.o ${KERNEL_OBJ} -Lbin -l:stdlib.lib -l:hal_i86.lib
 
 bin/stdlib.lib: ${STDLIB_OBJ}
@@ -79,4 +88,6 @@ done
 endef
 
 clean:
+	rm -rf /tmp/floppy.img
 	rm -rf build/*
+	rm -rf bin/*

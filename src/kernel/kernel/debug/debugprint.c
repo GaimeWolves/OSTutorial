@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #define VIDMEM 0xB8000
 
@@ -11,6 +14,17 @@
 
 static unsigned char xPos = 0, yPos = 0;
 static unsigned char color = 15;
+
+static void set_dstring()
+{
+	for (int y = 2; y < ROWS - 1; y++)
+		memcpy((void*)(VIDMEM + (y - 1) * COLUMNS * 2), (void*)(VIDMEM + y * COLUMNS * 2), COLUMNS * 2);
+	memset((void*)(VIDMEM + (ROWS - 2) * COLUMNS * 2), 0, COLUMNS * 2);
+	debug_set_pos(0, ROWS - 2);
+	debug_set_color(0x0D);
+	debug_print_string("DEBUG ");
+	debug_set_color(0x0F);
+}
 
 void debug_putc(const unsigned char c)
 {
@@ -26,36 +40,6 @@ void debug_putc(const unsigned char c)
 	unsigned char* ptr = (unsigned char*)VIDMEM + (xPos++) * 2 + yPos * 2 * COLUMNS;
 	*ptr++ = c;
 	*ptr = color;
-}
-
-char basechars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-char temp[32];
-
-void int_to_str(int i, unsigned base, char* buf, bool prepend_zero)
-{
-	if (base > 16 || base < 2) return;
-
-	if (i < 0)
-	{
-		*buf++ = '-';
-		i *= -1;
-	}
-
-	int pos = 0;
-
-	do
-	{
-		temp[pos] = basechars[i % base];
-		pos++;
-		i /= base;
-	} while ((prepend_zero && ((base == 16 && pos < 8) || (base == 2 && pos < 32))) || i);
-
-	int len = pos--;
-
-	for (int bpos = 0; bpos < len; pos--, bpos++)
-		buf[bpos] = temp[pos];
-
-	buf[len] = 0;
 }
 
 void debug_set_color(const unsigned char c)
@@ -108,20 +92,26 @@ void debug_printf(const char* str, ...)
 			case 'd':
 			case 'i':
 			{
-				int c = va_arg(args, int);
+				int32_t c = va_arg(args, int32_t);
 				char s[32] = { 0 };
-				int_to_str(c, 10, s, false);
+				itoa(c, 10, s, false);
+				debug_print_string(s);
+				break;
+			}
+			case 'u':
+			{
+				uint32_t c = va_arg(args, uint32_t);
+				char s[32] = { 0 };
+				uitoa(c, 10, s, false);
 				debug_print_string(s);
 				break;
 			}
 			case 'x':
 			case 'X':
 			{
-				int c = va_arg(args, int);
+				uint32_t c = va_arg(args, uint32_t);
 				char s[32] = { 0 };
-				int_to_str(c, 16, s, true);
-				debug_putc('0');
-				debug_putc('x');
+				uitoa(c, 16, s, true);
 				debug_print_string(s);
 				break;
 			}
@@ -133,11 +123,9 @@ void debug_printf(const char* str, ...)
 			}
 			case 'b':
 			{
-				int c = va_arg(args, int);
+				uint32_t c = va_arg(args, uint32_t);
 				char s[32] = { 0 };
-				int_to_str(c, 2, s, false);
-				debug_putc('0');
-				debug_putc('b');
+				uitoa(c, 2, s, false);
 				debug_print_string(s);
 				break;
 			}
@@ -156,12 +144,20 @@ void debug_printf(const char* str, ...)
 
 void debug_print_dstring(const char* str)
 {
-	for (int y = 2; y < ROWS - 1; y++)
-		memcpy((void*)(VIDMEM + (y - 1) * COLUMNS * 2), (void*)(VIDMEM + y * COLUMNS * 2), COLUMNS * 2);
-	memset((void*)(VIDMEM + (ROWS - 2) * COLUMNS * 2), 0, COLUMNS * 2);
-	debug_set_pos(0, ROWS - 2);
-	debug_set_color(0x0D);
-	debug_print_string("DEBUG ");
-	debug_set_color(0x0F);
+	set_dstring();
 	debug_print_string(str);
+}
+
+void debug_printf_dstring(const char* str, ...)
+{	
+	set_dstring();
+
+	va_list ap;
+	va_start(ap, str);
+
+	char buf[1024] = {0};
+	vsprintf(buf, str, ap);
+	debug_print_string(buf);
+
+	va_end(ap);
 }

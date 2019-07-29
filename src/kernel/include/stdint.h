@@ -10,6 +10,9 @@ typedef unsigned int		uint32_t;
 typedef long long			int64_t;
 typedef unsigned long long	uint64_t;
 
+typedef int 			intptr_t;
+typedef unsigned int 	uintptr_t;
+
 #define INT8_MIN	-128
 #define INT16_MIN	-32768
 #define INT32_MIN	-2147483648

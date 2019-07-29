@@ -1,9 +1,27 @@
-#include "debug/debugprint.h"
 #include <hal.h>
+#include <multiboot.h>
+#include <stdio.h>
 #include "exceptions.h"
+#include "pmm.h"
 
-void __attribute__((__cdecl__)) main()
+#ifdef _DEBUG
+#include "debug/debugprint.h"
+
+char* mem_type_str[] = {
+	"Available",
+	"Reserved",
+	"ACPI Reclaim",
+	"ACPI NVS Memory"
+};
+#endif
+
+void __attribute__((__cdecl__)) main(multiboot_info_t* boot_info)
 {
+	uint32_t kernel_size = 0;
+#ifdef _DEBUG
+	__asm__("mov %0, edx" : "=rm" (kernel_size));
+#endif
+
 	debug_clear_screen(0x0F);
 
 	hal_init();
@@ -40,6 +58,42 @@ void __attribute__((__cdecl__)) main()
 	set_int(31, reserved);
 	set_int(9, reserved);
 
+	enable_int();
+
+	uint32_t mem_size = 1024 + boot_info->memory_lo + boot_info->memory_hi * 64;
+
+	pmm_init(mem_size, 0x100000 + kernel_size * 512);
+
+#ifdef _DEBUG
+	debug_printf_dstring("[PMM]: System has %iKB physical memory",mem_size);
+	debug_print_dstring("[PMM] Physical Memory Map:");
+#endif
+
+	memory_region_t* region = (memory_region_t*)(boot_info->mmap_addr);
+
+	for (uint32_t i = 0; i < boot_info->mmap_len; i++) 
+	{
+		if (region[i].type > 4)
+			region[i].type = 1;
+
+#ifdef _DEBUG
+		debug_printf_dstring("[PMM]: %i: base: 0x%x%x len: 0x%x%x (%s)%i", i, 
+			region[i].start_hi, region[i].start_lo,
+			region[i].size_hi,region[i].size_lo,
+			mem_type_str[region[i].type-1], region[i].type);
+#endif
+
+		if (region[i].type==1)
+			pmm_init_region(region[i].start_lo, region[i].size_lo);
+	}
+
+	pmm_deinit_region(0x100000, kernel_size * 512 + 4096);
+
+#ifdef _DEBUG
+	debug_printf_dstring("[PMM]: initialized: %i blocks; used/reserved: %i free: %i ",
+		pmm_get_block_count(), pmm_get_used_block_count(), pmm_get_free_block_count ());
+#endif
+
 	debug_set_color(0x70);
 	debug_set_pos(0, 0);
 	debug_print_string("                                                                                 ");
@@ -48,8 +102,6 @@ void __attribute__((__cdecl__)) main()
 	enable_int();
 	debug_set_pos(1, 0);
 	debug_print_string(get_cpu_vendor());
-
-	enable_int();
 
 	for (;;)
 	{

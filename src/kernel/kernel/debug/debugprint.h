@@ -8,5 +8,6 @@ extern void debug_print_string(const char* str);
 extern void debug_printf(const char* str, ...);
 
 extern void debug_print_dstring(const char* str);
+extern void debug_printf_dstring(const char* str, ...);
 
 #endif
